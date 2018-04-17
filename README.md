@@ -6,4 +6,4 @@ This bot allows the Telegram user to request an image from either Sentinel-1, Se
 
 First, the user has to send /start to @TerraMaterBot in order to initialize the bot. It creates the user's chat ID along with other default settings. Furthermore, the user can switch between the satellites using /sentinel1, /sentinel2, and /sentinel3. To check what satellite is the current, use /test.
 
-![alt text](https://github.com/fvivian/TelegramBot/blob/master/TerraMater_img.png)
+![alt text](https://github.com/fvivian/TelegramBot/blob/master/TerraMaterV3_img.png)
