@@ -89,7 +89,9 @@ def get_current_image(sat, lon, lat):
         logger.info(f'Unknown satellite {sat}')
 
     try:
-        jres = json.loads(requests.get(url, params, timeout=5).content)
+        res = requests.get(url, params, timeout=5)
+        logger.info(f'Finder responds in {res.elapsed.total_seconds()} sec')
+        jres = json.loads(res.content)
     except requests.exceptions.Timeout:
         logger.error(f'Request to Finder timed out.')
         return None
