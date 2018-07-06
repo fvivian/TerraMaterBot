@@ -41,13 +41,10 @@ def sendVid(fileID, dictIn):
 
     try:
         vidDataRaw = getVidData(sat, lon, lat, fileID)
-    except:
-        logger.info(f'Could not get Video Data getVidData(sat, lon, lat, fileID).')
+    except Exception as e:
+        logger.info(f'Could not get Video Data getVidData(sat, lon, lat, fileID). Exception: {e}.')
         return
-    if len(vidDataRaw) <= 5:
-        os.rename(f'in/{fileID}', f'in/{fileID}EMPTY')
-        logger.info('amount of usable images too low')
-        return
+
     # invert data to BGR for openCV
     vidDataList = []
     for i in range(len(vidDataRaw)):
@@ -113,7 +110,7 @@ def sendVid(fileID, dictIn):
     
     return
     
-def getVidInfo(sat, lon, lat, fileID):
+def getVidInfo(sat, lon, lat, fileID, page=1):
         
         
     params_eocurl = {'dataset': 'ESA-DATASET',
@@ -130,6 +127,8 @@ def getVidInfo(sat, lon, lat, fileID):
     elif sat == 'S3':
         satellite = 'Sentinel3'
         params_eocurl['processingLevel'] = 'LEVEL1'
+        params_eocurl['maxRecords'] = 20
+        params_eocurl['page'] = page
         satTimeout = 40
     
     EOCURL = f'https://finder.eocloud.eu/resto/api/collections/{satellite}/search.json?'
@@ -137,12 +136,14 @@ def getVidInfo(sat, lon, lat, fileID):
     try:
         r1 = requests.get(EOCURL, params_eocurl, timeout=satTimeout)
         logger.info(f'Finder responds in {r1.elapsed.total_seconds()} seconds to {r1.url}.')
-    except Exception as e:
-        import urllib.parse as up
-        url = EOCURL + up.urlencode(params_eocurl)
-        logger.info(f'Finder did not respond in time {satTimeout}, {e}. URL = {url}')
+    except requests.exceptions.RequestException as e:
+        logger.info(f'Finder did not respond in time {satTimeout}, {e}')
         os.rename(f'in/{fileID}', f'in/{fileID}TIMEDOUT')
-        return
+        raise requests.exceptions.RequestException('Finder timeout for getVidInfo')
+    except Exception as e:
+        logger.info(f'Exception in getVidInfo({sat}, {lon}, {lat}, {fileID}): {e}')
+        raise
+
     js = json.loads(r1.content)
     products = []
     day_old = None
@@ -153,20 +154,17 @@ def getVidInfo(sat, lon, lat, fileID):
             if day_old != day:
                 products.append((day, j))
             day_old = day
-            #if len(products) >= 10:
-            #    return(list(reversed(products)))
-        if len(products)< 10:
-            logger.info(f'Not enough dates. Number of dates: {len(products)}. '
-                        f'URL: {r1.url}')
-            return(list(reversed(products)))
+        return(list(reversed(products)))
     except Exception as e:
         logger.info(f'Could not get the dates from the EO Cloud. {e}')
+        raise
 
-    return(list(reversed(products)))
 
 def getVidData(sat, lon, lat, fileID):
     
     vidDates = getVidInfo(sat, lon, lat, fileID)
+    if vidDates is None:
+        raise TypeError('getVidInfo returned None')
     
     params = {'service': 'WMS',
               'request': 'GetMap',
@@ -203,19 +201,26 @@ def getVidData(sat, lon, lat, fileID):
     
     res = []
     maxWhitePix = 480 * 320 * threshold/100
+    l=2
+    while l<10:
+        for i, (day, j) in enumerate(vidDates):
+            try:
+                r = requests.get(URL, {**params, **{'time': f'{day}/{day}'}}, timeout=10)
+                imgTiff =  np.array(Image.open(io.BytesIO(r.content)))
+                if imgTiff[(imgTiff >= 240).all(axis=2)].shape[0] <= maxWhitePix:
+                    res.append((day, imgTiff))
+            except Exception as e:
+                logger.info(f'Download loop, requestst to sentinel-hub, URL: {r.url}. Exception: {e}')
+            if len(res) >= 10:
+                logger.info(f'Download loop, all data downloaded.')
+                return(res)
+        if len(res) < 10:
+            logger.info(f'not enough usable data on page {l-1}')
+            vidDates = getVidInfo(sat, lon , lat, fileID, page=l)
+            l += 1
 
-    for i, (day, j) in enumerate(vidDates):
-        try:
-            r = requests.get(URL, {**params, **{'time': f'{day}/{day}'}}, timeout=10)
-            imgTiff =  np.array(Image.open(io.BytesIO(r.content)))
-            if imgTiff[(imgTiff >= 240).all(axis=2)].shape[0] <= maxWhitePix:
-                res.append((day, imgTiff))
-        except Exception as e:
-            logger.info(f'Download loop, requestst to sentinel-hub, URL: {r.url}. Exception: {e}')
-        if len(res) >= 10:
-            logger.info(f'Download loop, all data downloaded.')
-            return(res)
-            #break
+    logger.info(f'Downloaded data for {len(res)} dates.')
+    return(res)
     
     '''output is a list with the following structure:
     [('2018-02-20', array([[[255, 255, 255],
@@ -228,18 +233,13 @@ def getVidData(sat, lon, lat, fileID):
     
     res[0][1] gives acces to the img data for the first date.
     res[0][0] gives acces to the first date.'''
-    logger.info(f'Downloaded data for {len(res)} dates.')
-    return(res)
 
-#asdf=0
 while True:
     
-    #logger.info('outermost while loop')
     # find oldest file (= oldest request)
     inDir = 'in/'
     if os.listdir(inDir) != []:
         try:
-            #fileID = min([(f, os.path.getctime(os.path.join(inDir,f))) for f in os.listdir(inDir)])[0]
             fileID = min(os.listdir(inDir), key=lambda f: os.path.getctime(f'{inDir}/{f}'))
         except Exception as e:
             logger.info(f'Could not access oldest file: {e}')
