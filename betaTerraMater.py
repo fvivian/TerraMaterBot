@@ -241,6 +241,7 @@ def s5p(bot, update, user_data):
     user_data['sat'] = 'S5P'
     logaction('S5P', bot, update, user_data)
     # request_image('S5P', bot, update, user_data)
+    # new
     update.message.reply_text('Sentinel 5P is not there just yet.')
     return CONVERSATION
 
