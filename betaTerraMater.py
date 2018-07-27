@@ -192,8 +192,6 @@ def request_image(satellite, bot, update, user_data):
 
     result = get_current_image(satellite, lon, lat)
 
-    #logger.info(f'Got a result for user {update.message.from_user.id}; {result}')
-
     if result is not None:
         date, preview, url = result
         cf = ('cloudfree ' if satellite is 'S2' else '')
@@ -241,7 +239,7 @@ def s5p(bot, update, user_data):
     user_data['sat'] = 'S5P'
     logaction('S5P', bot, update, user_data)
     # request_image('S5P', bot, update, user_data)
-    # change from vm 
+    # change from local desktop
     update.message.reply_text('Sentinel 5P is not there just yet.')
     return CONVERSATION
 
