@@ -5,10 +5,15 @@ Created on Thu Apr 19 10:11:51 2018
 @author: Administrator
 """
 
+import numpy as np
 import json
 import logging
 import os
 import pickle
+from pyproj import Proj, transform
+from mpl_toolkits.basemap import Basemap, cm
+from PIL import Image
+import io
 import socket
 import sys
 import threading
@@ -238,9 +243,63 @@ def s3(bot, update, user_data):
 def s5p(bot, update, user_data):
     user_data['sat'] = 'S5P'
     logaction('S5P', bot, update, user_data)
-    # request_image('S5P', bot, update, user_data)
+    request_S5image('S5P', bot, update, user_data)
     # change from vm
     update.message.reply_text('Sentinel 5P is not there just yet.')
+    return CONVERSATION
+
+def request_S5image(bot, update, user_data):
+    
+    inProj = Proj(init='epsg:4326')
+    outProj = Proj(init='epsg:3857')
+    lon = 9.22
+    lat = 45.62
+    xC,yC = transform(inProj,outProj, lon, lat)
+    reso = 2e3
+    k = 1
+    width = 980*k
+    height= 540*k
+    xmin = xC - width*reso/2
+    xmax = xC + width*reso/2
+    ymin = yC - height*reso/2
+    ymax = yC + height*reso/2
+    ID = '2db0b567-5510-40c4-b060-dc8b0717251d'
+    URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ID
+    params = {'service': 'WMS',
+              'request': 'GetMap',
+              'layers': 'S5P_SO2',
+              'styles': '',
+              'format': 'image/tiff;depth=32f',
+              'version': '1.1.1',
+              'showlogo': 'false',
+              'height': height,
+              'width': width,
+              'srs': 'EPSG%3A3857',
+              'bbox': str(xmin)+', '+str(ymin)+', '+str(xmax)+', '+str(ymax)}
+    r = requests.get(URL, {**params})
+    try:
+        imgTiff =  np.array(Image.open(io.BytesIO(r.content)))
+    except Exception as e:
+        print(e)
+    lonmin,latmin = transform(outProj,inProj, xmin, ymin)
+    lonmax,latmax = transform(outProj,inProj, xmax, ymax)
+    m = Basemap(projection='merc',
+                llcrnrlat = latmin,
+                urcrnrlat = latmax,
+                llcrnrlon = lonmin,
+                urcrnrlon = lonmax,
+                resolution = 'i')
+    m.drawcoastlines()
+    m.drawcountries()
+    ny = imgTiff.shape[0]; nx = imgTiff.shape[1]
+    ma = np.ma.masked_values(imgTiff, 254, copy=False)
+    lons, lats = m.makegrid(nx, ny) # get lat/lons of ny by nx evenly space grid.
+    x, y = m(lons, lats) # compute map proj coordinates.
+    #clevs = np.arange(imgTiff.min(), ma.max(), 1)
+    cs = m.contourf(x,y,np.flip(ma,0), cmap=cm.GMT_red2green)
+    cbar = m.colorbar(cs,location='bottom',pad="5%")
+    cbar.set_label(params['layers']+r' in $mol / m^2$')
+    update.message.reply_photo(photo=f'{cs}')
     return CONVERSATION
 
 def gif(bot, update, user_data, job_queue):
