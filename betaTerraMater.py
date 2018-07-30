@@ -243,17 +243,21 @@ def s3(bot, update, user_data):
 def s5p(bot, update, user_data):
     user_data['sat'] = 'S5P'
     logaction('S5P', bot, update, user_data)
-    request_S5image('S5P', bot, update, user_data)
+    request_S5Pimage(bot, update, user_data)
     # change from vm
     update.message.reply_text('Sentinel 5P is not there just yet.')
     return CONVERSATION
 
-def request_S5image(bot, update, user_data):
+def request_S5Pimage(bot, update, user_data):
     
     inProj = Proj(init='epsg:4326')
     outProj = Proj(init='epsg:3857')
-    lon = 9.22
-    lat = 45.62
+    if 'location' in user_data:
+        lon, lat = user_data['location']
+    else:
+        logger.info(f'{update.message.from_user.id} has no location')
+        update.message.reply_text('Please send me a location first.')
+        return
     xC,yC = transform(inProj,outProj, lon, lat)
     reso = 2e3
     k = 1
