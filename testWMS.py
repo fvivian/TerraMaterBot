@@ -10,11 +10,12 @@ Created on Fri Apr 27 10:25:23 2018
 import requests
 import numpy as np
 from pyproj import Proj, transform
-from PIL import Image
 import io
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap, cm
+#from mpl_toolkits.basemap import Basemap, cm
 from time import time
+import rasterio
+from rasterio.io import MemoryFile
 startTot = time()
 
 inProj = Proj(init='epsg:4326')
@@ -36,9 +37,9 @@ URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ID
 params = {'service': 'WMS',
               'request': 'GetMap',
               'layers': 'S5P_NO2',
-              'styles': '',
-              #'transparent': 'True',
+              'styles': 'raw',
               'format': 'image/tiff',
+              'transparent': 'True',
               'version': '1.1.1',
               'showlogo': 'false',
               'time': '2018-04-18',
@@ -49,15 +50,18 @@ params['bbox'] = str(xmin)+', '+str(ymin)+', '+str(xmax)+', '+str(ymax)
 print('ruequest sent, waiting for response')
 r = requests.get(URL, {**params})
 print(f'download time: {r.elapsed.total_seconds()}', r.url)
+print(r.content)
 try:
-    imgTiff =  np.array(Image.open(io.BytesIO(r.content)))
+    with MemoryFile(r.content) as memfile:
+        with memfile.open() as dataset:
+            imgArr = dataset.read()
 except Exception as e:
     print(e)
     import sys
     sys.exit()
     
-print(imgTiff)
-
+print(imgArr)
+'''
 startPlot = time()
 
 lonmin,latmin = transform(outProj,inProj, xmin, ymin)
@@ -84,3 +88,4 @@ endPlot = time()
 endTot = time()
 print(f'time used to generate the plot: {endPlot - startPlot}')
 print(f'total time: {endTot - startTot}')
+'''

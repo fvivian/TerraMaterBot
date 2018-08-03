@@ -25,6 +25,7 @@ import telegram as tl
 from telegram.ext import CommandHandler, ConversationHandler,\
                          Filters, MessageHandler, RegexHandler, Updater
 from telegram.ext.dispatcher import run_async
+from rasterio.io import MemoryFile
 
 from geopy.geocoders import Nominatim
 import certifi
@@ -282,7 +283,9 @@ def request_S5Pimage(bot, update, user_data):
               'bbox': str(xmin)+', '+str(ymin)+', '+str(xmax)+', '+str(ymax)}
     r = requests.get(URL, {**params})
     try:
-        imgTiff =  np.array(Image.open(io.BytesIO(r.content)))
+        with MemoryFile(r.content) as memfile:
+            with memfile.open() as dataset:
+                imgTiff = dataset.read(1)
     except Exception as e:
         print(e)
     lonmin,latmin = transform(outProj,inProj, xmin, ymin)
