@@ -301,15 +301,17 @@ def request_S5Pimage(bot, update, user_data):
               'width': width,
               'srs': 'EPSG%3A3857',
               'bbox': str(xmin)+', '+str(ymin)+', '+str(xmax)+', '+str(ymax)}
-    r = requests.get(URL, {**params})
     try:
+        r = requests.get(URL, {**params}, timeout=10)
         with MemoryFile(r.content) as memfile:
             with memfile.open() as dataset:
                 imgData = dataset.read(1)
                 imgTiff = imgData * 1e4
                 logger.info('s5p image opened')
+    except requests.exceptions.Timeout:
+        logger.info(f'Request to the S5P WMS server timed out.')
     except Exception as e:
-        print(e)
+        logger.info(f'Could not retrieve or open S5P data, Exception: {e}.')
 
     photo = io.BytesIO()
     photo.name = 'image.png'
