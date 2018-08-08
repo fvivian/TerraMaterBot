@@ -11,13 +11,16 @@ import logging
 import os
 import pickle
 from pyproj import Proj, transform
+import matplotlib
+matplotlib.use('Agg')
 from mpl_toolkits.basemap import Basemap, cm
+import matplotlib.pyplot as plt
 from PIL import Image
 import io
 import socket
 import sys
 import threading
-from datetime import datetime
+import datetime
 import time
 import requests
 import uuid
@@ -52,7 +55,7 @@ entry_keyboard = [['/S1', '/S2', '/S3', '/S5P'],
                   [tl.KeyboardButton('location', request_location=True), '/timelapse','/help']]
 entry_markup = tl.ReplyKeyboardMarkup(entry_keyboard)
 
-def generate_browser_url(sat, date, lon, lat):
+def generate_browser_url(sat, date, lon, lat, no2=False):
     if sat == 'S1':
         instrument = 'Sentinel-1%20GRD%20IW'
         layer = '1_VV_ORTHORECTIFIED'
@@ -63,7 +66,10 @@ def generate_browser_url(sat, date, lon, lat):
         instrument = 'Sentinel-3%20OLCI'
         layer = '1_TRUE_COLOR'
     elif sat == 'S5P':
-        return 'NYI'
+        instrument = 'Sentinel-5P%20NO2' if no2 else 'Sentinel-5P%20CO'
+        layer = 'NO2_VISUALIZED' if no2 else 'CO_VISUALIZED'
+        #date = datetime.date.today() - datetime.timedelta(1)
+        date = ''
 
     url = f'http://apps.sentinel-hub.com/eo-browser/#lat={lat}&'\
           f'lng={lon}&zoom=10&datasource={instrument}&'\
@@ -188,7 +194,7 @@ def logaction(request, bot, update, user_data):
 
 @run_async
 def request_image(satellite, bot, update, user_data):
-    user_data['last_visit'] = datetime.now()
+    user_data['last_visit'] = datetime.datetime.now()
     if 'location' in user_data:
         lon, lat = user_data['location']
     else:
@@ -244,9 +250,22 @@ def s3(bot, update, user_data):
 def s5p(bot, update, user_data):
     user_data['sat'] = 'S5P'
     logaction('S5P', bot, update, user_data)
-    request_S5Pimage(bot, update, user_data)
+    entry_keyboard = [['/CO', '/NO2']]
+    rep_markup = tl.ReplyKeyboardMarkup(entry_keyboard) 
+    update.message.reply_text('Please choose a trace gas.', reply_markup=rep_markup)
+    #request_S5Pimage(bot, update, user_data)
     # change from vm
-    update.message.reply_text('Sentinel 5P is not there just yet.')
+    #update.message.reply_text('Sentinel 5P is not there just yet.')
+    return CONVERSATION
+
+def NO2(bot, update, user_data):
+    user_data['trace_gas'] = 'NO2'
+    request_S5Pimage(bot, update, user_data)
+    return CONVERSATION
+
+def CO(bot, update, user_data):
+    user_data['trace_gas'] = 'CO'
+    request_S5Pimage(bot, update, user_data)
     return CONVERSATION
 
 def request_S5Pimage(bot, update, user_data):
@@ -259,6 +278,7 @@ def request_S5Pimage(bot, update, user_data):
         logger.info(f'{update.message.from_user.id} has no location')
         update.message.reply_text('Please send me a location first.')
         return
+    trace_gas = user_data['trace_gas']
     xC,yC = transform(inProj,outProj, lon, lat)
     reso = 2e3
     k = 1
@@ -272,9 +292,9 @@ def request_S5Pimage(bot, update, user_data):
     URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ID
     params = {'service': 'WMS',
               'request': 'GetMap',
-              'layers': 'S5P_SO2',
+              'layers': f'S5P_{trace_gas}',
               'styles': '',
-              'format': 'image/tiff;depth=32f',
+              'format': 'image/tiff',
               'version': '1.1.1',
               'showlogo': 'false',
               'height': height,
@@ -285,9 +305,14 @@ def request_S5Pimage(bot, update, user_data):
     try:
         with MemoryFile(r.content) as memfile:
             with memfile.open() as dataset:
-                imgTiff = dataset.read(1)
+                imgData = dataset.read(1)
+                imgTiff = imgData * 1e4
+                logger.info('s5p image opened')
     except Exception as e:
         print(e)
+
+    photo = io.BytesIO()
+    photo.name = 'image.png'
     lonmin,latmin = transform(outProj,inProj, xmin, ymin)
     lonmax,latmax = transform(outProj,inProj, xmax, ymax)
     m = Basemap(projection='merc',
@@ -299,19 +324,27 @@ def request_S5Pimage(bot, update, user_data):
     m.drawcoastlines()
     m.drawcountries()
     ny = imgTiff.shape[0]; nx = imgTiff.shape[1]
-    ma = np.ma.masked_values(imgTiff, 254, copy=False)
+    ma1 = np.ma.masked_values(imgTiff, 0, copy=False)
+    ma = np.ma.masked_where(ma1 < 0 , ma1, copy=False)
     lons, lats = m.makegrid(nx, ny) # get lat/lons of ny by nx evenly space grid.
     x, y = m(lons, lats) # compute map proj coordinates.
-    #clevs = np.arange(imgTiff.min(), ma.max(), 1)
-    cs = m.contourf(x,y,np.flip(ma,0), cmap=cm.GMT_red2green)
+    cs = m.contourf(x,y,np.flip(ma,0), cmap=plt.cm.jet)
     cbar = m.colorbar(cs,location='bottom',pad="5%")
-    cbar.set_label(params['layers']+r' in $mol / m^2$')
-    update.message.reply_photo(photo=f'{cs}')
+    cbar.set_label(params['layers']+r' in $mol / cm^2$')
+    plt.savefig(photo)
+    photo.seek(0)
+    update.message.reply_photo(photo=photo, reply_markup=entry_markup)
+    plt.clf()
+    no2 = True if trace_gas == 'NO2' else False
+    eobrowser = generate_browser_url('S5P', None, lon, lat, no2=no2)
+    update.message.reply_text(text=f'Browse it here in <a href="{eobrowser}">EO Browser</a>.',
+                              parse_mode=tl.ParseMode.HTML,
+                              disable_web_page_preview=True)
     return CONVERSATION
 
 def gif(bot, update, user_data, job_queue):
     user_id = update.message.from_user.id
-    user_data['last_visit'] = datetime.now()
+    user_data['last_visit'] = datetime.datetime.now()
     user_data['user_id'] = user_id   
     
     
@@ -403,7 +436,7 @@ def location(bot, update, user_data):
 @run_async
 def get_and_respond_to_location(bot, update, user_data):
     user = update.message.from_user
-    user_data['last_visit'] = datetime.now()
+    user_data['last_visit'] = datetime.datetime.now()
     try:
         location = geolocator.geocode(update.message.text)
     except Exception as e:
@@ -431,7 +464,8 @@ def echo(bot, update, user_data):
     msg = update.message
     user = msg.from_user
     logger.info(f'{user.id} sends {update.message.text}')
-    get_and_respond_to_location(bot, update, user_data)
+    if update.message.text != 'CO' and update.message.text != 'NO2':
+        get_and_respond_to_location(bot, update, user_data)
 
 def error(bot, update, error):
     '''Log Errors caused by Updates.'''
@@ -472,7 +506,7 @@ def main():
                 logger.error(f'Conversations: {conv_handler.conversations}')
                 logger.error(sys.exc_info()[0])
             if backupWait == 1440: # for backing up userdata every 24 hours (1 step/min * 60 min/h * 24 h/day)
-                backuptime = datetime.today().isoformat()[:-7].replace(':', '')
+                backuptime = datetime.datetime.today().isoformat()[:-7].replace(':', '')
                 f = open(f'{DATA}/backup/userdataV3{backuptime}', 'wb+')
                 pickle.dump(dp.user_data, f)
                 f.close()
@@ -497,6 +531,8 @@ def main():
         CommandHandler('s2', s2, pass_user_data=True),
         CommandHandler('s3', s3, pass_user_data=True),
         CommandHandler('s5p', s5p, pass_user_data=True),
+        CommandHandler('NO2', NO2, pass_user_data=True),
+        CommandHandler('CO', CO, pass_user_data=True),
         CommandHandler('timelapse', gif, pass_user_data=True, pass_job_queue=True),
         MessageHandler(Filters.location, location, pass_user_data=True),
         MessageHandler(Filters.text, echo, pass_user_data=True)]
