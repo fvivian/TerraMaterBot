@@ -253,9 +253,6 @@ def s5p(bot, update, user_data):
     entry_keyboard = [['/CO', '/NO2']]
     rep_markup = tl.ReplyKeyboardMarkup(entry_keyboard) 
     update.message.reply_text('Please choose a trace gas.', reply_markup=rep_markup)
-    #request_S5Pimage(bot, update, user_data)
-    # change from vm
-    #update.message.reply_text('Sentinel 5P is not there just yet.')
     return CONVERSATION
 
 def NO2(bot, update, user_data):
@@ -310,8 +307,10 @@ def request_S5Pimage(bot, update, user_data):
                 logger.info('s5p image opened')
     except requests.exceptions.Timeout:
         logger.info(f'Request to the S5P WMS server timed out.')
+        return
     except Exception as e:
         logger.info(f'Could not retrieve or open S5P data, Exception: {e}.')
+        return
 
     photo = io.BytesIO()
     photo.name = 'image.png'
@@ -332,10 +331,11 @@ def request_S5Pimage(bot, update, user_data):
     x, y = m(lons, lats) # compute map proj coordinates.
     cs = m.contourf(x,y,np.flip(ma,0), cmap=plt.cm.jet)
     cbar = m.colorbar(cs,location='bottom',pad="5%")
-    cbar.set_label(params['layers']+r' in $mol / cm^2$')
+    cbar.set_label(params['layers']+r' in $mol / cm^2$ '+f'at lon = {"%.1f" % lon}, lat = {"%.1f" % lat}')
     plt.savefig(photo)
     photo.seek(0)
     update.message.reply_photo(photo=photo, reply_markup=entry_markup)
+    logger.info(f's5p image sent to {user_data["id"]}.')
     plt.clf()
     no2 = True if trace_gas == 'NO2' else False
     eobrowser = generate_browser_url('S5P', None, lon, lat, no2=no2)
@@ -450,7 +450,7 @@ def get_and_respond_to_location(bot, update, user_data):
         ulat, ulon = location[1]
         logger.info(f'{user.id} is at ({ulon}, {ulat})')
         user_data['location'] = (ulon, ulat)
-        update.message.reply_text(f'I believe this is at lon: {"%.2f" % ulon}, lat: {"%.2f" % ulat}.',
+        update.message.reply_text(f'I believe this is at lon: {"%.1f" % ulon}, lat: {"%.1f" % ulat}.',
                                   reply_markup=entry_markup)
         bot.sendLocation(chat_id=update.message.chat.id, latitude=ulat, longitude=ulon)
         update.message.reply_text(f'If this is the location you were looking for, get an image by using one of the buttons below. '
