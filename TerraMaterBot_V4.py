@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 #subprocess.call('python createVid.py')
 
 entry_keyboard = [['/S1', '/S2', '/S3', '/S5P'],
-                  [tl.KeyboardButton('location', request_location=True), '/timelapse','/help']]
+                  [tl.KeyboardButton('location', request_location=True), '/help']]
 entry_markup = tl.ReplyKeyboardMarkup(entry_keyboard)
 
 def generate_browser_url(sat, date, lon, lat, no2=False):
@@ -173,7 +173,6 @@ def help(bot, update):
 				'/S2: request a Sentinel-2 MSI image from your chosen location.\n'
 				'/S3: request a Sentinel-3 OLCI image from your chosen location.\n'
 				'/S5P: request a Sentinel-5P image from your chosen location.\n\n'
-           '/timelapse: request an animated GIF of a time lapse for Sentinel-2 or -3.\n'
 				'/help: display this message.\n'
 				'/start: display the initial welcoming message.\n\n'
 				'You can send me your current location by pressing the location button below or you can send me any location '
@@ -335,7 +334,7 @@ def request_S5Pimage(bot, update, user_data):
     plt.savefig(photo)
     photo.seek(0)
     update.message.reply_photo(photo=photo, reply_markup=entry_markup)
-    logger.info(f's5p image sent to {user_data["id"]}.')
+    logger.info(f's5p image sent to {user_data["user_id"]}.')
     plt.clf()
     no2 = True if trace_gas == 'NO2' else False
     eobrowser = generate_browser_url('S5P', None, lon, lat, no2=no2)
@@ -535,7 +534,6 @@ def main():
         CommandHandler('s5p', s5p, pass_user_data=True),
         CommandHandler('NO2', NO2, pass_user_data=True),
         CommandHandler('CO', CO, pass_user_data=True),
-        CommandHandler('timelapse', gif, pass_user_data=True, pass_job_queue=True),
         MessageHandler(Filters.location, location, pass_user_data=True),
         MessageHandler(Filters.text, echo, pass_user_data=True)]
 
