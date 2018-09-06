@@ -26,6 +26,10 @@ import os
 userOld = None
 timeOld = None
 
+# load tokens/IDs:
+with open('configFips.cfg') as f:
+    tokens = json.loads(f.read())
+
 logformat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 logging.basicConfig(format=logformat,
                     filename=f'vidScript.log',
@@ -51,7 +55,8 @@ def sendVid(fileID, dictIn):
         vidDataList.append(vidDataRaw[i][1][:,:,::-1])
     vidData = np.array(vidDataList)
 
-    fourcc = cv2.VideoWriter_fourcc('H','2','6','4')
+    #fourcc = cv2.VideoWriter_fourcc('H','2','6','4')
+    fourcc = cv2.VideoWriter_fourcc(*'DIVX')
     video = None
     fps = 25
     filename = f'out/{fileID}.mp4' # XVID / avi works on phone
@@ -67,6 +72,9 @@ def sendVid(fileID, dictIn):
     prev_frame = np.uint8([250])
     
     video = cv2.VideoWriter(filename, fourcc, fps, (480,320))
+    if not video:
+        import sys
+        sys.exit(1)
     logger.info('entering video creation loop')
     while(True):
 
@@ -177,13 +185,13 @@ def getVidData(sat, lon, lat, fileID):
               'srs': 'EPSG%3A3857'}
     
     if sat == 'S2':
-        ID = 'c539afcc-bc6d-46e9-9724-5a971dd62e3f'
+        ID = tokens['wms_token']['sentinel2']
         URL = 'https://services.sentinel-hub.com/ogc/wms/'+ID
         params['layers'] = 'S2-TRUE-COLOR'
         reso = 60
         threshold = 5 # in percent, 100% means every image will be used.
     elif sat == 'S3':
-        ID = '2c05911c-1db9-43c1-80ef-6796c9fd03dd'
+        ID = tokens['wms_tokens']['sentinel3']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ID
         params['layers'] = 'S3_TRUE_COLOR'
         threshold = 75 # in percent, 100% means every image will be used.

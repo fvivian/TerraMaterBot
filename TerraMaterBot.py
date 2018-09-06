@@ -42,6 +42,11 @@ hostname, DATA = socket.gethostname(), os.getcwd()
 geolocator = Nominatim(user_agent='myApp')
 CONVERSATION, = range(1)
 
+# import all the necessary tokens/IDs:
+with open('configFips.cfg') as f:
+    tokens = json.loads(f.read())
+
+
 # Enable logging
 logformat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 logging.basicConfig(format=logformat,
@@ -285,7 +290,8 @@ def request_S5Pimage(bot, update, user_data):
     xmax = xC + width*reso/2
     ymin = yC - height*reso/2
     ymax = yC + height*reso/2
-    ID = '2db0b567-5510-40c4-b060-dc8b0717251d'
+    print(user_data)
+    ID = tokens['wms_token']['sentinel5p']
     URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ID
     params = {'service': 'WMS',
               'request': 'GetMap',
@@ -519,7 +525,7 @@ def main():
     logger.info(f'Starting the bot ... on {hostname}')
 
     # Create the EventHandler and pass it your bot's token.
-    updater = Updater(os.environ['TOKEN'])
+    updater = Updater(tokens['bot_token'])
     #job = updater.job_queue
 
     # Get the dispatcher to register handlers
