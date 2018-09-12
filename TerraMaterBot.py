@@ -315,7 +315,7 @@ def request_S5Pimage(bot, update, user_data):
         logger.info(f'Request to the S5P WMS server timed out.')
         return
     except Exception as e:
-        logger.info(f'Could not retrieve or open S5P data, Exception: {e}.')
+        logger.info(f'Could not retrieve or open S5P data, Exception: {e}. {r.url}')
         return
 
     photo = io.BytesIO()
@@ -370,11 +370,11 @@ def gif(bot, update, user_data, job_queue):
                                   'Please choose between Sentinel-2 and Sentinel-3.')
         return
     
-    elif user_data['sat'] == 'S1' or user_data['sat'] == 'S5P':
-        logger.info(f'{user_id} requested GIF but has S1 or S5P as chosen satellite.')
-        update.message.reply_text(f'You have chosen {user_data["sat"]} which is not supported yet. '
-                                  'Please choose between Sentinel-2 and Sentinel-3.')
-        return
+    #elif user_data['sat'] == 'S1' or user_data['sat'] == 'S5P':
+    #    logger.info(f'{user_id} requested GIF but has S1 or S5P as chosen satellite.')
+    #    update.message.reply_text(f'You have chosen {user_data["sat"]} which is not supported yet. '
+    #                              'Please choose between Sentinel-2 and Sentinel-3.')
+    #    return
     
     cf = ('cloudfree ' if user_data['sat'] is 'S2' else '')
     update.message.reply_text(f'You requested a {user_data["sat"]} time lapse video. '

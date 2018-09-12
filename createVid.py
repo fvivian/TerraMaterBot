@@ -127,7 +127,11 @@ def getVidInfo(sat, lon, lat, fileID, page=1):
                      'maxRecords': 100,
                      'sortOrder': 'descending',
                      'sortParam': 'startDate'}
-    
+    if sat == 'S1':
+        satellite = 'Sentinel1'
+        params_eocurl['productType'] = 'GRD'
+        params_eocurl['processingLevel'] = 'LEVEL1'
+        satTimeout = 10
     if sat == 'S2':
         satellite = 'Sentinel2'
         params_eocurl['cloudCover'] = '[0,10]'
@@ -184,6 +188,12 @@ def getVidData(sat, lon, lat, fileID):
               'width': 480,
               'srs': 'EPSG%3A3857'}
     
+    if sat == 'S1':
+        ID = tokens['wms_token']['sentinel1']
+        URL= 'https://services.sentinel-hub.com/ogs/wms'+ID
+        params['layers'] = 'S1-VV-ORTHORECTIFIED'
+        reso = 60
+        threshold = 5 # in percent, 100% means every image will be used.
     if sat == 'S2':
         ID = tokens['wms_token']['sentinel2']
         URL = 'https://services.sentinel-hub.com/ogc/wms/'+ID
@@ -210,7 +220,7 @@ def getVidData(sat, lon, lat, fileID):
     res = []
     maxWhitePix = 480 * 320 * threshold/100
     l=2
-    while l<10:
+    while l<12:
         for i, (day, j) in enumerate(vidDates):
             try:
                 r = requests.get(URL, {**params, **{'time': f'{day}/{day}'}}, timeout=10)
@@ -218,7 +228,7 @@ def getVidData(sat, lon, lat, fileID):
                 if imgTiff[(imgTiff >= 240).all(axis=2)].shape[0] <= maxWhitePix:
                     res.append((day, imgTiff))
             except Exception as e:
-                logger.info(f'Download loop, requestst to sentinel-hub, Exception: {e}')
+                logger.info(f'Exception in download loop (requests to sentinel-hub), Exception: {e}')
             if len(res) >= 10:
                 logger.info(f'Download loop, all data downloaded.')
                 return(res)
@@ -226,7 +236,11 @@ def getVidData(sat, lon, lat, fileID):
             logger.info(f'not enough usable data on page {l-1}')
             vidDates = getVidInfo(sat, lon , lat, fileID, page=l)
             l += 1
-
+        else:
+            logger.info(f'not enough usable data on first 10 pages. Aborting download.')
+            return
+    print(res)
+    asdfasdf
     logger.info(f'Downloaded data for {len(res)} dates.')
     return(res)
     
