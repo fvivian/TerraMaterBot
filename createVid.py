@@ -240,7 +240,7 @@ def getVidData(sat, lon, lat, fileID):
             logger.info(f'not enough usable data on first 10 pages. Aborting download.')
             return
     print(res)
-    asdfasdf
+
     logger.info(f'Downloaded data for {len(res)} dates.')
     return(res)
     
