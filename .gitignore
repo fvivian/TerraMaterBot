@@ -1,0 +1,7 @@
+# ignore all kind of files
+*
+# except for python scripts
+!TerraMaterBot.py
+!createVid.py
+!config.cfg
+!.gitignore
