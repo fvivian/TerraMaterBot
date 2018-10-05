@@ -55,8 +55,8 @@ def sendVid(fileID, dictIn):
         vidDataList.append(vidDataRaw[i][1][:,:,::-1])
     vidData = np.array(vidDataList)
 
-    #fourcc = cv2.VideoWriter_fourcc('H','2','6','4')
-    fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+    fourcc = cv2.VideoWriter_fourcc(*'H264')
+    #fourcc = cv2.VideoWriter_fourcc(*'DIVX')
     video = None
     fps = 25
     filename = f'out/{fileID}.mp4' # XVID / avi works on phone
