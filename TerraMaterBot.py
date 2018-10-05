@@ -50,7 +50,7 @@ with open('configFips.cfg') as f:
 # Enable logging
 logformat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 logging.basicConfig(format=logformat,
-                    filename=f'{DATA}/logTerraMater.log',
+                    filename=f'logTerraMater.log',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -262,11 +262,13 @@ def s5p(bot, update, user_data):
 
 def NO2(bot, update, user_data):
     user_data['trace_gas'] = 'NO2'
+    update.message.reply_text('Thank you. Creating the Sentinel-5P NO2 image might take a few seconds.', reply_markup=entry_markup)
     request_S5Pimage(bot, update, user_data)
     return CONVERSATION
 
 def CO(bot, update, user_data):
     user_data['trace_gas'] = 'CO'
+    update.message.reply_text('Thank you. Creating the Sentinel-5P CO image might take a few seconds.', reply_markup=entry_markup)
     request_S5Pimage(bot, update, user_data)
     return CONVERSATION
 
