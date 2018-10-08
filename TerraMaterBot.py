@@ -43,7 +43,7 @@ geolocator = Nominatim(user_agent='myApp')
 CONVERSATION, = range(1)
 
 # import all the necessary tokens/IDs:
-with open('configFips.cfg') as f:
+with open('config.cfg') as f:
     tokens = json.loads(f.read())
 
 
