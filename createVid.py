@@ -201,7 +201,7 @@ def getVidData(sat, lon, lat, fileID):
         reso = 60
         threshold = 5 # in percent, 100% means every image will be used.
     elif sat == 'S3':
-        ID = tokens['wms_tokens']['sentinel3']
+        ID = tokens['wms_token']['sentinel3']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ID
         params['layers'] = 'S3_TRUE_COLOR'
         threshold = 75 # in percent, 100% means every image will be used.
