@@ -38,14 +38,19 @@ import geopy.geocoders
 
 ctx = ssl.create_default_context(cafile=certifi.where())
 geopy.geocoders.options.default_ssl_context = ctx
-hostname, DATA = socket.gethostname(), os.getcwd()
-geolocator = Nominatim()
+hostname = socket.gethostname() 
+geolocator = Nominatim(user_agent='myApp')
 CONVERSATION, = range(1)
+
+# import all the necessary tokens/IDs:
+with open('configFips.cfg') as f:
+    tokens = json.loads(f.read())
+
 
 # Enable logging
 logformat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 logging.basicConfig(format=logformat,
-                    filename=f'{DATA}/logTerraMater.log',
+                    filename=f'logTerraMater.log',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -173,6 +178,7 @@ def help(bot, update):
 				'/S2: request a Sentinel-2 MSI image from your chosen location.\n'
 				'/S3: request a Sentinel-3 OLCI image from your chosen location.\n'
 				'/S5P: request a Sentinel-5P image from your chosen location.\n\n'
+                                #'/timelapse: request an animated GIF of a time lapse for Sentinel-2 or -3.\n'
 				'/help: display this message.\n'
 				'/start: display the initial welcoming message.\n\n'
 				'You can send me your current location by pressing the location button below or you can send me any location '
@@ -284,7 +290,8 @@ def request_S5Pimage(bot, update, user_data):
     xmax = xC + width*reso/2
     ymin = yC - height*reso/2
     ymax = yC + height*reso/2
-    ID = '2db0b567-5510-40c4-b060-dc8b0717251d'
+    print(user_data)
+    ID = tokens['wms_token']['sentinel5p']
     URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ID
     params = {'service': 'WMS',
               'request': 'GetMap',
@@ -308,7 +315,7 @@ def request_S5Pimage(bot, update, user_data):
         logger.info(f'Request to the S5P WMS server timed out.')
         return
     except Exception as e:
-        logger.info(f'Could not retrieve or open S5P data, Exception: {e}.')
+        logger.info(f'Could not retrieve or open S5P data, Exception: {e}. {r.url}')
         return
 
     photo = io.BytesIO()
@@ -363,11 +370,11 @@ def gif(bot, update, user_data, job_queue):
                                   'Please choose between Sentinel-2 and Sentinel-3.')
         return
     
-    elif user_data['sat'] == 'S1' or user_data['sat'] == 'S5P':
-        logger.info(f'{user_id} requested GIF but has S1 or S5P as chosen satellite.')
-        update.message.reply_text(f'You have chosen {user_data["sat"]} which is not supported yet. '
-                                  'Please choose between Sentinel-2 and Sentinel-3.')
-        return
+    #elif user_data['sat'] == 'S1' or user_data['sat'] == 'S5P':
+    #    logger.info(f'{user_id} requested GIF but has S1 or S5P as chosen satellite.')
+    #    update.message.reply_text(f'You have chosen {user_data["sat"]} which is not supported yet. '
+    #                              'Please choose between Sentinel-2 and Sentinel-3.')
+    #    return
     
     cf = ('cloudfree ' if user_data['sat'] is 'S2' else '')
     update.message.reply_text(f'You requested a {user_data["sat"]} time lapse video. '
@@ -477,9 +484,9 @@ def main():
 
     def load_state():
         try:
-            with open(f'{DATA}/backup/conversationsV4', 'rb') as f:
+            with open(f'backup/conversationsV4', 'rb') as f:
                 conv_handler.conversations = pickle.load(f)
-            with open(f'{DATA}/backup/userdataV4', 'rb') as f:
+            with open(f'backup/userdataV4', 'rb') as f:
                 dp.user_data = pickle.load(f)
         except FileNotFoundError:
             logger.error('Data file(s) for restoring state not found')
@@ -498,9 +505,9 @@ def main():
             # Before pickling
             resolved = conv_handler.conversations.copy()
             try:
-                with open(f'{DATA}/backup/conversationsV4', 'wb+') as f:
+                with open(f'backup/conversationsV4', 'wb+') as f:
                     pickle.dump(resolved, f)
-                with open(f'{DATA}/backup/userdataV4', 'wb+') as f:
+                with open(f'backup/userdataV4', 'wb+') as f:
                     pickle.dump(dp.user_data, f)
             except Exception as e:
                 logger.error(f'Could not save state: {e}')
@@ -508,7 +515,7 @@ def main():
                 logger.error(sys.exc_info()[0])
             if backupWait == 1440: # for backing up userdata every 24 hours (1 step/min * 60 min/h * 24 h/day)
                 backuptime = datetime.datetime.today().isoformat()[:-7].replace(':', '')
-                f = open(f'{DATA}/backup/userdataV3{backuptime}', 'wb+')
+                f = open(f'backup/userdataV4{backuptime}', 'wb+')
                 pickle.dump(dp.user_data, f)
                 f.close()
                 backupWait = 0
@@ -518,7 +525,7 @@ def main():
     logger.info(f'Starting the bot ... on {hostname}')
 
     # Create the EventHandler and pass it your bot's token.
-    updater = Updater(os.environ['TOKEN'])
+    updater = Updater(tokens['bot_token'])
     #job = updater.job_queue
 
     # Get the dispatcher to register handlers
@@ -532,6 +539,7 @@ def main():
         CommandHandler('s2', s2, pass_user_data=True),
         CommandHandler('s3', s3, pass_user_data=True),
         CommandHandler('s5p', s5p, pass_user_data=True),
+        #CommandHandler('timelapse', gif, pass_user_data=True, pass_job_queue=True),
         CommandHandler('NO2', NO2, pass_user_data=True),
         CommandHandler('CO', CO, pass_user_data=True),
         MessageHandler(Filters.location, location, pass_user_data=True),
