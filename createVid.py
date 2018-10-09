@@ -228,7 +228,7 @@ def getVidData(sat, lon, lat, fileID):
                 if imgTiff[(imgTiff >= 240).all(axis=2)].shape[0] <= maxWhitePix:
                     res.append((day, imgTiff))
             except Exception as e:
-                logger.info(f'Exception in download loop (requests to sentinel-hub), Exception: {e}')
+                logger.info(f'Exception in download loop (requests to sentinel-hub), Exception: {e}, URL: {r.url}')
             if len(res) >= 10:
                 logger.info(f'Download loop, all data downloaded.')
                 return(res)

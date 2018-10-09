@@ -101,6 +101,7 @@ def get_current_image(sat, lon, lat):
               'sortOrder': 'descending',
               'sortParam': 'startDate'}
 
+    timeout = 10
     if sat == 'S1':
         params['processingLevel'] = 'LEVEL1'
         params['productType'] = 'GRD'
@@ -111,13 +112,14 @@ def get_current_image(sat, lon, lat):
         params['processingLevel'] = 'LEVEL1'
         params['instrument'] = 'OL'
         params['productType'] = 'EFR'
+        timeout=30
     elif sat == 'S5P':
         pass
     else:
         logger.info(f'Unknown satellite {sat}')
 
     try:
-        res = requests.get(url, params, timeout=10)
+        res = requests.get(url, params, timeout=timeout)
         logger.info(f'Finder responds in {res.elapsed.total_seconds()} sec')
         jres = json.loads(res.content)
     except requests.exceptions.Timeout:
