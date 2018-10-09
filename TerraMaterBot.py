@@ -160,7 +160,7 @@ def get_current_image(sat, lon, lat):
 # update. Error handlers also receive the raised TelegramError object in error.
 
 
-def start(bot, update, user_data):
+(bot, update, user_data):
     '''Send a message when the command /start is issued.'''
     user = update.message.from_user
     logger.info(f'Starting conversation with {user.id}')
@@ -250,6 +250,7 @@ def s2(bot, update, user_data):
 def s3(bot, update, user_data):
     user_data['sat'] = 'S3'
     logaction('S3', bot, update, user_data)
+    update.message.reply_text('Sentinel 3 OCLI image was requested and might take a few seconds to be sent to you')
     request_image('S3', bot, update, user_data)
     return CONVERSATION
 
