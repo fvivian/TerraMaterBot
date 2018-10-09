@@ -318,9 +318,11 @@ def request_S5Pimage(bot, update, user_data):
                 logger.info('s5p image opened')
     except requests.exceptions.Timeout:
         logger.info(f'Request to the S5P WMS server timed out.')
+        updater.message.reply_text('Unfortunately, there is no answer from the server, the system might be busy.')
         return
     except Exception as e:
         logger.info(f'Could not retrieve or open S5P data, Exception: {e}. {r.url}')
+        updater.message.reply_text('There is no image available at the moment, I\'ll see to this being fixed.') 
         return
 
     photo = io.BytesIO()
