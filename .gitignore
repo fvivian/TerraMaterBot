@@ -3,4 +3,9 @@
 # except for python scripts
 !TerraMaterBot.py
 !createVid.py
+<<<<<<< HEAD
+=======
+!config.cfg
+!utils.py
+>>>>>>> fe3710b385c5817092c421a1b95b9deb9df70282
 !.gitignore
