@@ -20,7 +20,7 @@ import telegram as tl
 from telegram.ext import CommandHandler, ConversationHandler, \
     Filters, MessageHandler, RegexHandler, Updater
 from telegram.ext.dispatcher import run_async
-
+import requests
 from geopy.geocoders import Nominatim
 import certifi
 import ssl
@@ -39,7 +39,7 @@ with open('configFips.cfg') as f:
     tokens = json.loads(f.read())
 
 # Enable logging
-logformat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+logformat = '%(asctime)s - %(name)s - %(levelname)s in %(filename)s, line %(lineno)d - %(message)s'
 logging.basicConfig(format=logformat,
                     filename=f'logTerraMater.log',
                     level=logging.INFO)
@@ -104,33 +104,32 @@ def request_image(satellite, bot, update, user_data):
         logger.info(f'{update.message.from_user.id} has no location')
         update.message.reply_text('Please send me a location first.')
         return
+    url = utils.generate_browser_url('S2', None, lon, lat)
 
-    result = utils.get_current_image(satellite, lon, lat)
-
-    if result is not None:
-        date, preview, url = result
+    try:
+        imgData = utils.get_current_wms_image(satellite, lon, lat)
         cf = ('cloudfree ' if satellite is 'S2' else '')
-        reply = f'The latest {satellite} {cf}image was acquired on {date}'
-        update.message.reply_text(reply)
-        if preview is not None:
-            try:
-                update.message.reply_photo(photo=f'{preview}')
-            except Exception as e:
-                update.message.reply_text('No good preview is available. I\'ll see to this being fixed.')
-                logger.error(f'Preview not valid: {preview}. Exception: {e}.')
-        else:
-            update.message.reply_text('Unfortunately, there is no preview.')
-
+        update.message.reply_text(f'The latest {satellite} {cf}image was acquired on {date}')
+        update.message.reply_photo(photo=imgData)
         update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
                                   disable_web_page_preview=True)
-    else:
-        update.message.reply_text('Unfortunately, there is no answer from the server, '
-                                  'the system might be busy.')
+    except requests.exception.Timeout:
+        update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
+        logger.info('Connection to WMS server for f{satellite} timed out.')
+    except Exception as e:
+        update.message.reply_text('I\'m afraid I couldn\'t open the image for unkown reasons. Please try again later.')
+        logger.info(f'Could not get/open image from the WMS server. Exception: {e}')
 
 
 def s1(bot, update, user_data):
     user_data['sat'] = 'S1'
+
+    if 'location' not in user_data:
+        logger.info(f'{update.message.from_user.id} has no location')
+        update.message.reply_text('Please send me a location first.')
+        return
+
     log_action('S1', bot, update, user_data)
     request_image('S1', bot, update, user_data)
     return CONVERSATION
@@ -138,6 +137,10 @@ def s1(bot, update, user_data):
 
 def s2(bot, update, user_data):
     user_data['sat'] = 'S2'
+    if 'location' not in user_data:
+        logger.info(f'{update.message.from_user.id} has no location')
+        update.message.reply_text('Please send me a location first.')
+        return
     log_action('S2', bot, update, user_data)
     request_image('S2', bot, update, user_data)
     return CONVERSATION
@@ -145,17 +148,23 @@ def s2(bot, update, user_data):
 
 def s3(bot, update, user_data):
     user_data['sat'] = 'S3'
+    if 'location' not in user_data:
+        logger.info(f'{update.message.from_user.id} has no location')
+        update.message.reply_text('Please send me a location first.')
+        return
     log_action('S3', bot, update, user_data)
-    update.message.reply_text('Sentinel 3 OCLI image was requested and might take a few seconds to be sent to you.')
     request_image('S3', bot, update, user_data)
     return CONVERSATION
 
 
 def s5p(bot, update, user_data):
     user_data['sat'] = 'S5P'
+    if 'location' not in user_data:
+        logger.info(f'{update.message.from_user.id} has no location')
+        update.message.reply_text('Please send me a location first.')
+        return
     log_action('S5P', bot, update, user_data)
-    entry_keyboard = [['/CO', '/NO2']]
-    rep_markup = tl.ReplyKeyboardMarkup(entry_keyboard)
+    rep_markup = tl.ReplyKeyboardMarkup([['/CO', '/NO2']])
     update.message.reply_text('Please choose a trace gas.', reply_markup=rep_markup)
     return CONVERSATION
 
@@ -164,7 +173,21 @@ def NO2(bot, update, user_data):
     user_data['trace_gas'] = 'NO2'
     update.message.reply_text('Thank you. Creating the Sentinel-5P NO2 image might take a few seconds.',
                               reply_markup=entry_markup)
-    utils.request_S5Pimage(bot, update, user_data)
+    lon, lat = user_data['location']
+    url = utils.generate_browser_url('S5P', None, lon, lat, no2=True)
+    try:
+        img = utils.request_S5P_image(bot, update, user_data)
+        update.message.reply_photo(photo=img, reply_markup=entry_markup)
+        update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
+                                  parse_mode=tl.ParseMode.HTML,
+                                  disable_web_page_preview=True)
+    except requests.exception.Timeout:
+        update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
+        logger.info('Connection to WMS server for f{satellite} timed out.')
+    except Exception as e:
+        update.message.reply_text('I\'m afraid I couldn\'t open the image for unkown reasons. Please try again later.')
+        logger.info(f'Could not get/open image from the WMS server. Exception: {e}')
+
     return CONVERSATION
 
 
@@ -172,7 +195,21 @@ def CO(bot, update, user_data):
     user_data['trace_gas'] = 'CO'
     update.message.reply_text('Thank you. Creating the Sentinel-5P CO image might take a few seconds.',
                               reply_markup=entry_markup)
-    utils.request_S5Pimage(bot, update, user_data)
+    lon, lat = user_data['location']
+    url = utils.generate_browser_url('S5P', None, lon, lat, no2=False)
+    try:
+        img = utils.request_S5P_image(bot, update, user_data)
+        update.message.reply_photo(photo=img, reply_markup=entry_markup)
+        update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
+                                  parse_mode=tl.ParseMode.HTML,
+                                  disable_web_page_preview=True)
+    except requests.exception.Timeout:
+        update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
+        logger.info('Connection to WMS server for f{satellite} timed out.')
+    except Exception as e:
+        update.message.reply_text('I\'m afraid I couldn\'t open the image for unkown reasons. Please try again later.')
+        logger.info(f'Could not get/open image from the WMS server. Exception: {e}')
+
     return CONVERSATION
 
 

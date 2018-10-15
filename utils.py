@@ -1,17 +1,22 @@
 
-import numpy as np
 
+import numpy as np
 from pyproj import Proj, transform
 import matplotlib
-
-matplotlib.use('Agg')
 from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
-#from PIL import Image
 import io
-
+import json
 import requests
 from rasterio.io import MemoryFile
+import logging
+
+matplotlib.use('Agg')
+logger = logging.getLogger(__name__)
+
+# import all the necessary tokens/IDs:
+with open('configFips.cfg') as f:
+    tokens = json.loads(f.read())
 
 
 def generate_browser_url(sat, date, lon, lat, no2=False):
@@ -29,134 +34,92 @@ def generate_browser_url(sat, date, lon, lat, no2=False):
         layer = 'NO2_VISUALIZED' if no2 else 'CO_VISUALIZED'
         date = ''
 
-    url = f'http://apps.sentinel-hub.com/eo-browser/#lat={lat}&'\
-          f'lng={lon}&zoom=10&datasource={instrument}&'\
+    url = f'http://apps.sentinel-hub.com/eo-browser/#lat={lat}&' \
+          f'lng={lon}&zoom=10&datasource={instrument}&' \
           f'time={date}&preset={layer}'
 
     return url
 
 
-def get_current_image(sat, lon, lat):
-
-    sats = {'S1': 'Sentinel1',
-            'S2': 'Sentinel2',
-            'S3': 'Sentinel3',
-            'S5P': 'Sentinel5P'}
-
-    coll = sats.get(sat, 'Sentinel2')
-
-    url = f'https://finder.eocloud.eu/resto/api/collections/{coll}/search.json'
-
-    params = {'dataset': 'ESA-DATASET',
-              'maxRecords': 10,
-              'lon': f'{lon}',
-              'lat': f'{lat}',
-              'sortOrder': 'descending',
-              'sortParam': 'startDate'}
-
-    timeout = 10
-    if sat == 'S1':
-        params['processingLevel'] = 'LEVEL1'
-        params['productType'] = 'GRD'
-    elif sat == 'S2':
-        params['cloudCover'] = '[0,10]'
-        params['processingLevel'] = 'LEVELL1C'
-    elif sat == 'S3':
-        params['processingLevel'] = 'LEVEL1'
-        params['instrument'] = 'OL'
-        params['productType'] = 'EFR'
-        timeout=30
-    elif sat == 'S5P':
-        pass
-    else:
-        logger.info(f'Unknown satellite {sat}')
-
-    try:
-        res = requests.get(url, params, timeout=timeout)
-        logger.info(f'Finder responds in {res.elapsed.total_seconds()} sec')
-        jres = json.loads(res.content)
-    except requests.exceptions.Timeout:
-        logger.error(f'Request to Finder timed out.')
-        return None
-    except Exception as e:
-        logger.error(f'Could not obtain result from Finder for {sat}, {lon}/{lat}; exception was {e}')
-        return None
-
-    if len(jres['features']) >= 1:
-        j = jres['features'][0]
-        path = j['properties']['productIdentifier']
-
-        if sat == 'S1':
-            preview = j['properties']['thumbnail']
-        elif sat == 'S2':
-            if j['properties']['thumbnail'] is not None:
-                preview = j['properties']['thumbnail']
-            else:
-                title = j['properties']['title'][:-5]
-                suffix = f'{title}/{title}-ql.jpg'
-                url = f'https://finder.eocloud.eu/files/{path[8:]}/{suffix}'
-                preview = url
-                logger.info(f'Thumbnail: {j["properties"]["thumbnail"]}')
-        elif sat == 'S3':
-            preview = j['properties']['thumbnail']
-        else:
-            preview = None
-        logger.info(f'Request to {res.url} returned the following: {preview}')
-        date = j['properties']['startDate'].split('T')[0]
-        return (date, preview, generate_browser_url(sat, date, lon, lat))
-    else:
-        logger.info(f'Request to {res.url} returned the following: {jres}')
-        return None
-
-
-def request_S5Pimage(bot, update, user_data):
+def get_bounding_box(lon, lat, reso):
     inProj = Proj(init='epsg:4326')
     outProj = Proj(init='epsg:3857')
-    if 'location' in user_data:
-        lon, lat = user_data['location']
-    else:
-        logger.info(f'{update.message.from_user.id} has no location')
-        update.message.reply_text('Please send me a location first.')
-        return
-    trace_gas = user_data['trace_gas']
+
     xC, yC = transform(inProj, outProj, lon, lat)
-    reso = 2e3
-    k = 1
-    width = 980 * k
-    height = 540 * k
+    width = 980
+    height = 540
     xmin = xC - width * reso / 2
     xmax = xC + width * reso / 2
     ymin = yC - height * reso / 2
     ymax = yC + height * reso / 2
-    print(user_data)
-    ID = tokens['wms_token']['sentinel5p']
-    URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
+
+    return(xmin, ymin, xmax, ymax)
+
+
+def get_current_wms_image(sat, lon, lat):
+    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
+
     params = {'service': 'WMS',
               'request': 'GetMap',
-              'layers': f'S5P_{trace_gas}',
+              'layers': '',
               'styles': '',
               'format': 'image/tiff',
               'version': '1.1.1',
               'showlogo': 'false',
-              'height': height,
-              'width': width,
+              'height': 720,
+              'width': 1280,
               'srs': 'EPSG%3A3857',
-              'bbox': str(xmin) + ', ' + str(ymin) + ', ' + str(xmax) + ', ' + str(ymax)}
-    try:
-        r = requests.get(URL, {**params}, timeout=10)
-        with MemoryFile(r.content) as memfile:
-            with memfile.open() as dataset:
-                imgData = dataset.read(1)
-                imgTiff = imgData * 1e4
-                logger.info('s5p image opened')
-    except requests.exceptions.Timeout:
-        logger.info(f'Request to the S5P WMS server timed out.')
-        updater.message.reply_text('Unfortunately, there is no answer from the server, the system might be busy.')
-        return
-    except Exception as e:
-        logger.info(f'Could not retrieve or open S5P data, Exception: {e}. {r.url}')
-        updater.message.reply_text('There is no image available at the moment, I\'ll see to this being fixed.')
-        return
+              'bbox': f'{xmin}, {ymin}, {xmax}, {ymax}'}
+    if sat == 'S1':
+        ID = tokens['wms_token']['sentinel1']
+        params['layers'] = 'S1_VV_ORTHORECTIFIED'
+    if sat == 'S2':
+        ID = tokens['wms_token']['sentinel2']
+        params['layers'] = 'S2_TRUE_COLOR'
+    if sat == 'S3':
+        ID = tokens['wms_token']['sentinel3']
+        params['layers'] = 'S3_TRUE_COLOR'
+
+    URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
+
+    r = requests.get(URL, {**params}, timeout=10)
+    with MemoryFile(r.content) as memfile:
+        with memfile.open() as dataset:
+            imgData = dataset.read(1)
+    return(imgData)
+
+
+def request_S5P_image(lon, lat, gas):
+    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+
+    ID = tokens['wms_token']['sentinel5p']
+    URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
+    params = {'service': 'WMS',
+              'request': 'GetMap',
+              'layers': f'S5P_{gas}',
+              'styles': '',
+              'format': 'image/tiff',
+              'version': '1.1.1',
+              'showlogo': 'false',
+              'height': 540,
+              'width': 980,
+              'srs': 'EPSG%3A3857',
+              'bbox': f'{xmin}, {ymin}, {xmax}, {ymax}'}
+
+    r = requests.get(URL, {**params}, timeout=10)
+    with MemoryFile(r.content) as memfile:
+        with memfile.open() as dataset:
+            imgData = dataset.read(1)
+
+    imgTiff = generate_s5p_image_from_data(imgData, lon, lat, params['layers'])
+    return imgTiff
+
+
+def generate_s5p_image_from_data(data, lon, lat, layer):
+    imgTiff = data * 1e4
+    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+    inProj = Proj(init='epsg:4326')
+    outProj = Proj(init='epsg:3857')
 
     photo = io.BytesIO()
     photo.name = 'image.png'
@@ -170,7 +133,7 @@ def request_S5Pimage(bot, update, user_data):
                 resolution='i')
     m.drawcoastlines()
     m.drawcountries()
-    ny = imgTiff.shape[0];
+    ny = imgTiff.shape[0]
     nx = imgTiff.shape[1]
     ma1 = np.ma.masked_values(imgTiff, 0, copy=False)
     ma = np.ma.masked_where(ma1 < 0, ma1, copy=False)
@@ -178,14 +141,8 @@ def request_S5Pimage(bot, update, user_data):
     x, y = m(lons, lats)  # compute map proj coordinates.
     cs = m.contourf(x, y, np.flip(ma, 0), cmap=plt.cm.jet)
     cbar = m.colorbar(cs, location='bottom', pad="5%")
-    cbar.set_label(params['layers'] + r' in $mol / cm^2$ ' + f'at lon = {"%.1f" % lon}, lat = {"%.1f" % lat}')
+    cbar.set_label(f'{layer}' + r' in $mol / cm^2$ ' + f'at lon = {"%.1f" % lon}, lat = {"%.1f" % lat}')
     plt.savefig(photo)
     photo.seek(0)
-    update.message.reply_photo(photo=photo, reply_markup=entry_markup)
-    logger.info(f's5p image sent to {user_data["user_id"]}.')
-    plt.clf()
-    no2 = True if trace_gas == 'NO2' else False
-    eobrowser = generate_browser_url('S5P', None, lon, lat, no2=no2)
-    update.message.reply_text(text=f'Browse it here in <a href="{eobrowser}">EO Browser</a>.',
-                              parse_mode=tl.ParseMode.HTML,
-                              disable_web_page_preview=True)
+
+    return photo
