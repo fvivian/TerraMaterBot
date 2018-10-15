@@ -30,10 +30,7 @@ timeOld = None
 with open('configFips.cfg') as f:
     tokens = json.loads(f.read())
 
-logformat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-logging.basicConfig(format=logformat,
-                    filename=f'vidScript.log',
-                    level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 logger.info(f'Starting the bot ...')
