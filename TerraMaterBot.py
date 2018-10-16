@@ -35,7 +35,7 @@ geolocator = Nominatim(user_agent='myApp')
 CONVERSATION, = range(1)
 
 # import all the necessary tokens/IDs:
-with open('config.cfg') as f:
+with open('configFips.cfg') as f:
     tokens = json.loads(f.read())
 
 # Enable logging
@@ -114,7 +114,7 @@ def request_image(satellite, bot, update, user_data):
         update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
                                   disable_web_page_preview=True)
-    except requests.exception.Timeout:
+    except requests.exceptions.Timeout:
         update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
         logger.info('Connection to WMS server for f{satellite} timed out.')
     except Exception as e:
@@ -181,7 +181,7 @@ def NO2(bot, update, user_data):
         update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
                                   disable_web_page_preview=True)
-    except requests.exception.Timeout:
+    except requests.exceptions.Timeout:
         update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
         logger.info('Connection to WMS server for f{satellite} timed out.')
     except Exception as e:
@@ -203,7 +203,7 @@ def CO(bot, update, user_data):
         update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
                                   disable_web_page_preview=True)
-    except requests.exception.Timeout:
+    except requests.exceptions.Timeout:
         update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
         logger.info('Connection to WMS server for f{satellite} timed out.')
     except Exception as e:

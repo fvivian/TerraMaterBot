@@ -32,9 +32,6 @@ with open('configFips.cfg') as f:
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
-logger.info(f'Starting the bot ...')
-
 def sendVid(fileID, dictIn):
     
     sat  = dictIn['sat']
