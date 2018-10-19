@@ -86,8 +86,9 @@ def create_parameters_getmap(sat, lon, lat, gas=None):
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
     if sat == 'S5P':
         ID = tokens['wms_token']['sentinel5p']
-        URL - 'https://services.eocloud.sentinel-hub.com/v1/wms/'+ ID
+        URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ ID
         params['layers'] = f'S5P_{gas}'
+        params['format'] = 'image/tiff'
         xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
         
@@ -142,7 +143,7 @@ def create_parameters_featureinfo(sat, lon, lat, gas=None):
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
     if sat == 'S5P':
         ID = tokens['wms_token']['sentinel5p']
-        URL = 'https://services.eocloud.sentinel-hub.com/v1/wms/'+ ID
+        URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ ID
         params['query_layers'] = f'S5P_{gas}'
         xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
@@ -165,7 +166,7 @@ def get_latest_image_date(sat, lon, lat, gas=None):
 
 def get_current_S5P_image(lon, lat, gas):
 
-    URL, params = create_parameters_featureinfo('S5P', lon, lat, gas=gas)
+    URL, params = create_parameters_getmap('S5P', lon, lat, gas=gas)
 
     r = requests.get(URL, {**params}, timeout=10)
     try:
@@ -213,5 +214,5 @@ def generate_s5p_image_from_data(data, lon, lat, layer):
     cbar.set_label(f'{layer}' + r' in $mol / cm^2$ ' + f'at lon = {"%.1f" % lon}, lat = {"%.1f" % lat}')
     plt.savefig(photo)
     photo.seek(0)
-
+    plt.clf()
     return photo
