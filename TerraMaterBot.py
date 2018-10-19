@@ -177,7 +177,9 @@ def NO2(bot, update, user_data):
     lon, lat = user_data['location']
     url = utils.generate_browser_url('S5P', None, lon, lat, no2=True)
     try:
-        img = utils.request_S5P_image(lon, lat, user_data['trace_gas'])
+        img = utils.get_current_S5P_image(lon, lat, user_data['trace_gas'])
+        date= utils.get_latest_image_date('S5P', lon, lat, gas=user_data['trace_gas'])
+        update.message.reply_text(f'The latest Sentinel-5P image was acquired on {date}')
         update.message.reply_photo(photo=img, reply_markup=entry_markup)
         update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
@@ -199,7 +201,9 @@ def CO(bot, update, user_data):
     lon, lat = user_data['location']
     url = utils.generate_browser_url('S5P', None, lon, lat, no2=False)
     try:
-        img = utils.request_S5P_image(lon, lat, user_data['trace_gas'])
+        img = utils.get_current_S5P_image(lon, lat, user_data['trace_gas'])
+        date= utils.get_latest_image_date('S5P', lon, lat, gas=user_data['trace_gas'])
+        update.message.reply_text(f'The latest Sentinel-5P image was acquired on {date}')
         update.message.reply_photo(photo=img, reply_markup=entry_markup)
         update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,

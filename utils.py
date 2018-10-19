@@ -55,7 +55,7 @@ def get_bounding_box(lon, lat, reso):
 
     return(xmin, ymin, xmax, ymax)
 
-def create_parameters_getmap(sat, lon, lat):
+def create_parameters_getmap(sat, lon, lat, gas=None):
     xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
 
     params = {'service': 'WMS',
@@ -84,6 +84,13 @@ def create_parameters_getmap(sat, lon, lat):
         params['layers'] = 'S3_TRUE_COLOR'
         xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
+    if sat == 'S5P':
+        ID = tokens['wms_token']['sentinel5p']
+        URL - 'https://services.eocloud.sentinel-hub.com/v1/wms/'+ ID
+        params['layers'] = f'S5P_{gas}'
+        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+        params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
+        
     return(URL, params)
 
 def get_current_wms_image(sat, lon, lat):
@@ -106,7 +113,7 @@ def get_current_wms_image(sat, lon, lat):
         raise
 
 
-def create_parameters_featureinfo(sat, lon, lat):
+def create_parameters_featureinfo(sat, lon, lat, gas=None):
     xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
 
     params = {'service': 'WMS',
@@ -133,40 +140,32 @@ def create_parameters_featureinfo(sat, lon, lat):
         params['query_layers'] = 'S3_TRUE_COLOR'
         xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
+    if sat == 'S5P':
+        ID = tokens['wms_token']['sentinel5p']
+        URL = 'https://services.eocloud.sentinel-hub.com/v1/wms/'+ ID
+        params['query_layers'] = f'S5P_{gas}'
+        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+        params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
     return(URL, params)
 
-def get_latest_image_date(sat, lon, lat):
+def get_latest_image_date(sat, lon, lat, gas=None):
     URL, params = create_parameters_featureinfo(sat, lon, lat)
 
-    
     try:
         r = requests.get(URL, {**params}, timeout=10)
         js = json.loads(r.content)
         return(js['features'][0]['properties']['date'])
     except requests.exceptions.RequestException as e:
-        logger.exception(f'WMS server did not respond to GetMap request in time.')
+        logger.exception(f'WMS server did not respond to GetFeatureInfo request in time.')
         raise requests.exceptions.RequestsException('WMS server timed out')
     except Exception as e:
-        logger.exception(f'Exception in get_current_wms_image')
+        logger.exception(f'Exception in get_latest_image_date')
         logger.info(f'URL that caused exception: {r.url}')
         raise
 
-def request_S5P_image(lon, lat, gas):
-    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+def get_current_S5P_image(lon, lat, gas):
 
-    ID = tokens['wms_token']['sentinel5p']
-    URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
-    params = {'service': 'WMS',
-              'request': 'GetMap',
-              'layers': f'S5P_{gas}',
-              'styles': '',
-              'format': 'image/tiff',
-              'version': '1.1.1',
-              'showlogo': 'false',
-              'height': 540,
-              'width': 980,
-              'srs': 'EPSG%3A3857',
-              'bbox': f'{xmin}, {ymin}, {xmax}, {ymax}'}
+    URL, params = create_parameters_featureinfo('S5P', lon, lat, gas=gas)
 
     r = requests.get(URL, {**params}, timeout=10)
     try:
@@ -174,10 +173,10 @@ def request_S5P_image(lon, lat, gas):
             with memfile.open() as dataset:
                 imgData = dataset.read(1)
     except requests.exceptions.RequestException as e:
-        logger.exception(f'WMS server did not respond in time.')
+        logger.exception(f'S5P WMS server did not respond to GetMap in time.')
         raise requests.exceptions.RequestsException('WMS server timed out')
     except Exception as e:
-        logger.exception(f'Exception in get_current_wms_image')
+        logger.exception(f'Exception in get_current_S5P_image')
         logger.info(f'URL that caused exception: {r.url}')
         raise
 
