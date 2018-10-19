@@ -3,6 +3,7 @@
 import numpy as np
 from pyproj import Proj, transform
 import matplotlib
+matplotlib.use('Agg')
 from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
 import io
@@ -11,7 +12,6 @@ import requests
 from rasterio.io import MemoryFile
 import logging
 
-matplotlib.use('Agg')
 logger = logging.getLogger(__name__)
 
 # import all the necessary tokens/IDs:
@@ -55,15 +55,14 @@ def get_bounding_box(lon, lat, reso):
 
     return(xmin, ymin, xmax, ymax)
 
-
-def get_current_wms_image(sat, lon, lat):
+def create_parameters_getmap(sat, lon, lat):
     xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
 
     params = {'service': 'WMS',
               'request': 'GetMap',
               'layers': '',
               'styles': '',
-              'format': 'image/tiff',
+              'format': 'image/jpeg',
               'version': '1.1.1',
               'showlogo': 'false',
               'height': 720,
@@ -72,22 +71,85 @@ def get_current_wms_image(sat, lon, lat):
               'bbox': f'{xmin}, {ymin}, {xmax}, {ymax}'}
     if sat == 'S1':
         ID = tokens['wms_token']['sentinel1']
-        params['layers'] = 'S1_VV_ORTHORECTIFIED'
+        URL = 'http://services.sentinel-hub.com/ogc/wms/' + ID
+        params['layers'] = 'S1-VV-ORTHORECTIFIED'
     if sat == 'S2':
         ID = tokens['wms_token']['sentinel2']
-        params['layers'] = 'S2_TRUE_COLOR'
+        URL = 'http://services.sentinel-hub.com/ogc/wms/' + ID
+        params['layers'] = 'S2-TRUE-COLOR'
+        params['maxcc'] = 0
     if sat == 'S3':
         ID = tokens['wms_token']['sentinel3']
+        URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
         params['layers'] = 'S3_TRUE_COLOR'
+        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+        params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
+    return(URL, params)
 
-    URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
+def get_current_wms_image(sat, lon, lat):
 
-    r = requests.get(URL, {**params}, timeout=10)
-    with MemoryFile(r.content) as memfile:
-        with memfile.open() as dataset:
-            imgData = dataset.read(1)
-    return(imgData)
+    URL, params = create_parameters_getmap(sat, lon, lat)
 
+    try:
+        #with MemoryFile(r.content) as memfile:
+        #    with memfile.open() as dataset:
+        #        imgData = dataset.read(1)
+        #return(imgData)
+        r = requests.get(URL, {**params}, timeout=10)
+        return(r.url)
+    except requests.exceptions.RequestException as e:
+        logger.exception(f'WMS server did not respond to GetMap request in time.')
+        raise requests.exceptions.RequestsException('WMS server timed out')
+    except Exception as e:
+        logger.exception(f'Exception in get_current_wms_image')
+        logger.info(f'URL that caused exception: {r.url}')
+        raise
+
+
+def create_parameters_featureinfo(sat, lon, lat):
+    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
+
+    params = {'service': 'WMS',
+              'request': 'GetFeatureInfo',
+              'info_format': 'application/json',
+              'width': 1,
+              'height':1,
+              'i': 0,
+              'j': 0,
+              'srs': 'EPSG%3A3857',
+              'bbox': f'{xmin}, {ymin}, {xmax}, {ymax}'}
+    if sat == 'S1':
+        ID = tokens['wms_token']['sentinel1']
+        URL = 'http://services.sentinel-hub.com/ogc/wms/' + ID
+        params['query_layers'] = 'S1-VV-ORTHORECTIFIED'
+    if sat == 'S2':
+        ID = tokens['wms_token']['sentinel2']
+        URL = 'http://services.sentinel-hub.com/ogc/wms/' + ID
+        params['query_layers'] = 'S2-TRUE-COLOR'
+        params['maxcc'] = 0
+    if sat == 'S3':
+        ID = tokens['wms_token']['sentinel3']
+        URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
+        params['query_layers'] = 'S3_TRUE_COLOR'
+        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+        params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
+    return(URL, params)
+
+def get_latest_image_date(sat, lon, lat):
+    URL, params = create_parameters_featureinfo(sat, lon, lat)
+
+    
+    try:
+        r = requests.get(URL, {**params}, timeout=10)
+        js = json.loads(r.content)
+        return(js['features'][0]['properties']['date'])
+    except requests.exceptions.RequestException as e:
+        logger.exception(f'WMS server did not respond to GetMap request in time.')
+        raise requests.exceptions.RequestsException('WMS server timed out')
+    except Exception as e:
+        logger.exception(f'Exception in get_current_wms_image')
+        logger.info(f'URL that caused exception: {r.url}')
+        raise
 
 def request_S5P_image(lon, lat, gas):
     xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
@@ -107,9 +169,17 @@ def request_S5P_image(lon, lat, gas):
               'bbox': f'{xmin}, {ymin}, {xmax}, {ymax}'}
 
     r = requests.get(URL, {**params}, timeout=10)
-    with MemoryFile(r.content) as memfile:
-        with memfile.open() as dataset:
-            imgData = dataset.read(1)
+    try:
+        with MemoryFile(r.content) as memfile:
+            with memfile.open() as dataset:
+                imgData = dataset.read(1)
+    except requests.exceptions.RequestException as e:
+        logger.exception(f'WMS server did not respond in time.')
+        raise requests.exceptions.RequestsException('WMS server timed out')
+    except Exception as e:
+        logger.exception(f'Exception in get_current_wms_image')
+        logger.info(f'URL that caused exception: {r.url}')
+        raise
 
     imgTiff = generate_s5p_image_from_data(imgData, lon, lat, params['layers'])
     return imgTiff
