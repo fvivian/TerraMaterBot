@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import io
 import json
 import requests
+from urllib.parse import urlencode
 from rasterio.io import MemoryFile
 import logging
 
@@ -55,7 +56,7 @@ def get_bounding_box(lon, lat, reso):
 
     return(xmin, ymin, xmax, ymax)
 
-def create_parameters_getmap(sat, lon, lat, gas=None):
+def get_wms_image_url(sat, lon, lat, gas=None):
     xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
 
     params = {'service': 'WMS',
@@ -92,8 +93,10 @@ def create_parameters_getmap(sat, lon, lat, gas=None):
         xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
         
-    return(URL, params)
-
+    url = f'{URL}?{urllib.parse.urlencode(params)}'
+    
+    return(url)
+"""
 def get_current_wms_image(sat, lon, lat):
 
     URL, params = create_parameters_getmap(sat, lon, lat)
@@ -112,7 +115,7 @@ def get_current_wms_image(sat, lon, lat):
         logger.exception(f'Exception in get_current_wms_image')
         logger.info(f'URL that caused exception: {r.url}')
         raise
-
+"""
 
 def create_parameters_featureinfo(sat, lon, lat, gas=None):
     xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
