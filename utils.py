@@ -56,7 +56,7 @@ def get_bounding_box(lon, lat, reso):
 
     return(xmin, ymin, xmax, ymax)
 
-def get_wms_image_url(sat, lon, lat, gas=None):
+def create_wms_image_url(sat, lon, lat, gas=None):
     xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
 
     params = {'service': 'WMS',
