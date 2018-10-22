@@ -107,12 +107,12 @@ def request_image(satellite, bot, update, user_data):
     url = utils.generate_browser_url('S2', None, lon, lat)
 
     try:
-        imgURL = utils.get_current_wms_image(satellite, lon, lat)
         date = utils.get_latest_image_date(satellite, lon, lat)
         cf = ('cloudfree ' if satellite is 'S2' else '')
         update.message.reply_text(f'The latest {satellite} {cf}image was acquired on {date}')
-        update.message.reply_photo(photo=imgURL)
-        update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
+        img_url = utils.create_wms_image_url(satellite, lon, lat)
+        update.message.reply_photo(photo=img_url)
+        update.message.reply_text(text=f'Browse it here in the <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
                                   disable_web_page_preview=True)
     except requests.exceptions.Timeout:
