@@ -117,48 +117,54 @@ def get_current_wms_image(sat, lon, lat):
         raise
 """
 
-def create_parameters_featureinfo(sat, lon, lat, gas=None):
+def create_parameters_wfs(sat, lon, lat, gas=None):
     xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
 
-    params = {'service': 'WMS',
-              'request': 'GetFeatureInfo',
+    params = {'service': 'WFS',
+              'request': 'GetFeature',
               'info_format': 'application/json',
-              'width': 1,
-              'height':1,
-              'i': 0,
-              'j': 0,
               'srs': 'EPSG%3A3857',
+              'maxfeatures': '100',
               'bbox': f'{xmin}, {ymin}, {xmax}, {ymax}'}
     if sat == 'S1':
         ID = tokens['wms_token']['sentinel1']
-        URL = 'http://services.sentinel-hub.com/ogc/wms/' + ID
-        params['query_layers'] = 'S1-VV-ORTHORECTIFIED'
+        URL = 'http://services.sentinel-hub.com/ogc/wfs/' + ID
+        params['typenames'] = 'S1.TILE'
     if sat == 'S2':
         ID = tokens['wms_token']['sentinel2']
-        URL = 'http://services.sentinel-hub.com/ogc/wms/' + ID
-        params['query_layers'] = 'S2-TRUE-COLOR'
+        URL = 'http://services.sentinel-hub.com/ogc/wfs/' + ID
+        params['typenames'] = 'S2.TILE'
         params['maxcc'] = 0
     if sat == 'S3':
         ID = tokens['wms_token']['sentinel3']
-        URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
-        params['query_layers'] = 'S3_TRUE_COLOR'
+        URL = 'http://services.eocloud.sentinel-hub.com/v1/wfs/' + ID
+        params['typenames'] = 'S3.TILE'
         xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
     if sat == 'S5P':
         ID = tokens['wms_token']['sentinel5p']
-        URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ ID
-        params['query_layers'] = f'S5P_{gas}'
+        URL = 'http://services.eocloud.sentinel-hub.com/v1/wfs/' + ID
+        params['typenames'] = f'S5P_{gas}'
         xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
     return(URL, params)
 
-def get_latest_image_date(sat, lon, lat, gas=None):
-    URL, params = create_parameters_featureinfo(sat, lon, lat)
+def get_image_dates(sat, lon, lat, for_video=False, gas=None):
+    URL, params = create_parameters_wfs(sat, lon, lat)
 
     try:
         r = requests.get(URL, {**params}, timeout=10)
         js = json.loads(r.content)
-        return(js['features'][0]['properties']['date'])
+        if for_video:
+            dates = []
+            date_old = None
+            for j in js['features']:
+                if date_old != j['properties']['date']:
+                    dates.append(j['properties']['date'])
+                date_old = j['properties']['date']
+            return(dates)
+        else:
+            return(js['features'][0]['properties']['date'])
     except requests.exceptions.RequestException as e:
         logger.exception(f'WMS server did not respond to GetFeatureInfo request in time.')
         raise requests.exceptions.RequestsException('WMS server timed out')
