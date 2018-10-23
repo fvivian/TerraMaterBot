@@ -93,7 +93,7 @@ def create_wms_image_url(sat, lon, lat, gas=None):
         xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
         
-    url = f'{URL}?{urllib.parse.urlencode(params)}'
+    url = f'{URL}?{urlencode(params)}'
     
     return(url)
 """
@@ -169,9 +169,9 @@ def get_latest_image_date(sat, lon, lat, gas=None):
 
 def get_current_S5P_image(lon, lat, gas):
 
-    URL, params = create_parameters_getmap('S5P', lon, lat, gas=gas)
+    URL = create_wms_image_url('S5P', lon, lat, gas=gas)
 
-    r = requests.get(URL, {**params}, timeout=10)
+    r = requests.get(URL, timeout=10)
     try:
         with MemoryFile(r.content) as memfile:
             with memfile.open() as dataset:
@@ -184,7 +184,7 @@ def get_current_S5P_image(lon, lat, gas):
         logger.info(f'URL that caused exception: {r.url}')
         raise
 
-    imgTiff = generate_s5p_image_from_data(imgData, lon, lat, params['layers'])
+    imgTiff = generate_s5p_image_from_data(imgData, lon, lat, gas)
     return imgTiff
 
 
