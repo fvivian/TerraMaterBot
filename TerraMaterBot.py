@@ -35,7 +35,7 @@ geolocator = Nominatim(user_agent='myApp')
 CONVERSATION, = range(1)
 
 # import all the necessary tokens/IDs:
-with open('config.cfg') as f:
+with open('configFips.cfg') as f:
     tokens = json.loads(f.read())
 
 # Enable logging
@@ -71,7 +71,7 @@ def help(bot, update):
     """Send a message when the command /start is issued."""
     update.message.reply_text('I accept the following entries:\n'
                               '/S1: request a Sentinel-1 GRD IW image from your chosen location.\n'
-                              '/S2: request a Sentinel-2 MSI image from your chosen location.\n'
+                              '/S2:  a Sentinel-2 MSI image from your chosen location.\n'
                               '/S3: request a Sentinel-3 OLCI image from your chosen location.\n'
                               '/S5P: request a Sentinel-5P image from your chosen location.\n\n'
                               '/timelapse: request an animated GIF of a time lapse for Sentinel-2 or -3.\n'
@@ -107,19 +107,20 @@ def request_image(satellite, bot, update, user_data):
     url = utils.generate_browser_url('S2', None, lon, lat)
 
     try:
-        imgData = utils.get_current_wms_image(satellite, lon, lat)
+        date = utils.get_latest_image_date(satellite, lon, lat)
         cf = ('cloudfree ' if satellite is 'S2' else '')
         update.message.reply_text(f'The latest {satellite} {cf}image was acquired on {date}')
-        update.message.reply_photo(photo=imgData)
-        update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
+        img_url = utils.create_wms_image_url(satellite, lon, lat)
+        update.message.reply_photo(photo=img_url)
+        update.message.reply_text(text=f'Browse it here in the <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
                                   disable_web_page_preview=True)
-    except requests.exception.Timeout:
+    except requests.exceptions.Timeout:
         update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
-        logger.info('Connection to WMS server for f{satellite} timed out.')
+        logger.exception('Connection to WMS server for f{satellite} timed out. URL: {img_url}.')
     except Exception as e:
         update.message.reply_text('I\'m afraid I couldn\'t open the image for unkown reasons. Please try again later.')
-        logger.info(f'Could not get/open image from the WMS server. Exception: {e}')
+        logger.exception(f'Could not get/open image from the WMS server. Exception: {e}. URL: {img_url}.')
 
 
 def s1(bot, update, user_data):
@@ -176,17 +177,19 @@ def NO2(bot, update, user_data):
     lon, lat = user_data['location']
     url = utils.generate_browser_url('S5P', None, lon, lat, no2=True)
     try:
-        img = utils.request_S5P_image(bot, update, user_data)
+        img = utils.get_current_S5P_image(lon, lat, user_data['trace_gas'])
+        #date= utils.get_latest_image_date('S5P', lon, lat, gas=user_data['trace_gas'])
+        #update.message.reply_text(f'The latest Sentinel-5P image was acquired on {date}')
         update.message.reply_photo(photo=img, reply_markup=entry_markup)
         update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
                                   disable_web_page_preview=True)
-    except requests.exception.Timeout:
+    except requests.exceptions.Timeout:
         update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
-        logger.info('Connection to WMS server for f{satellite} timed out.')
+        logger.exception('Connection to WMS server for f{satellite} timed out.')
     except Exception as e:
         update.message.reply_text('I\'m afraid I couldn\'t open the image for unkown reasons. Please try again later.')
-        logger.info(f'Could not get/open image from the WMS server. Exception: {e}')
+        logger.exception(f'Could not get/open image from the WMS server. Exception: {e}')
 
     return CONVERSATION
 
@@ -198,17 +201,19 @@ def CO(bot, update, user_data):
     lon, lat = user_data['location']
     url = utils.generate_browser_url('S5P', None, lon, lat, no2=False)
     try:
-        img = utils.request_S5P_image(bot, update, user_data)
+        img = utils.get_current_S5P_image(lon, lat, user_data['trace_gas'])
+        #date= utils.get_latest_image_date('S5P', lon, lat, gas=user_data['trace_gas'])
+        #update.message.reply_text(f'The latest Sentinel-5P image was acquired on {date}')
         update.message.reply_photo(photo=img, reply_markup=entry_markup)
         update.message.reply_text(text=f'Browse it here in <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
                                   disable_web_page_preview=True)
-    except requests.exception.Timeout:
+    except requests.exceptions.Timeout:
         update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
-        logger.info('Connection to WMS server for f{satellite} timed out.')
+        logger.exception('Connection to WMS server for f{satellite} timed out.')
     except Exception as e:
         update.message.reply_text('I\'m afraid I couldn\'t open the image for unkown reasons. Please try again later.')
-        logger.info(f'Could not get/open image from the WMS server. Exception: {e}')
+        logger.exception(f'Could not get/open image from the WMS server. Exception: {e}')
 
     return CONVERSATION
 
@@ -314,8 +319,7 @@ def get_and_respond_to_location(bot, update, user_data):
     try:
         location = geolocator.geocode(update.message.text)
     except Exception as e:
-        logger.info(f'Geolocator returned an error for {update.message.text}')
-        logger.error(e)
+        logger.exception(f'Geolocator returned an error for {update.message.text}')
         location = None
     if location is not None:
         logger.info(location)

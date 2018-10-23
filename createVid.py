@@ -34,9 +34,8 @@ logformat = '%(asctime)s - %(name)s - %(levelname)s: %(filename)s in line %(line
 logging.basicConfig(format=logformat,
                     filename=f'vidScript.log',
                     level=logging.INFO)
-
 logger = logging.getLogger(__name__)
-logger.info(f'Starting the bot ...')
+logger.info(f'Starting the bot...')
 
 def sendVid(fileID, dictIn):
     
