@@ -243,18 +243,18 @@ def getVidData(sat, lon, lat, fileID):
 
     logger.info(f'Downloaded data for {len(res)} dates.')
     return(res)
-    
-    '''output is a list with the following structure:
-    [('2018-02-20', array([[[255, 255, 255],
-        [255, 255, 255],
-        ...,]]]))
-    [('2018-02-15', array([[[255, 255, 255],
-        [255, 255, 255],
-        [255, 255, 255],
-        ...,]]]))
-    
-    res[0][1] gives acces to the img data for the first date.
-    res[0][0] gives acces to the first date.'''
+
+    """('output is a list with the following structure:
+         [('2018-02-20', array([[[255, 255, 255],
+             [255, 255, 255],
+             ...,]]]))
+         [('2018-02-15', array([[[255, 255, 255],
+             [255, 255, 255],
+             [255, 255, 255],
+             ...,]]]))
+         
+         res[0][1] gives acces to the img data for the first date.
+         res[0][0] gives acces to the first date.')"""
 
 while True:
     
