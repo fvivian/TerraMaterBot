@@ -71,7 +71,7 @@ def help(bot, update):
     """Send a message when the command /start is issued."""
     update.message.reply_text('I accept the following entries:\n'
                               '/S1: request a Sentinel-1 GRD IW image from your chosen location.\n'
-                              '/S2:  a Sentinel-2 MSI image from your chosen location.\n'
+                              '/S2: request a Sentinel-2 MSI image from your chosen location.\n'
                               '/S3: request a Sentinel-3 OLCI image from your chosen location.\n'
                               '/S5P: request a Sentinel-5P image from your chosen location.\n\n'
                               '/timelapse: request an animated GIF of a time lapse for Sentinel-2 or -3.\n'
