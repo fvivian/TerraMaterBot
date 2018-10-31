@@ -46,7 +46,7 @@ def send_video(fileID, dictIn):
     try:
         vidDataRaw = get_video_data(sat, lon, lat, fileID)
     except Exception as e:
-        logger.info(f'Could not get Video Data getVidData(sat, lon, lat, fileID). Exception: {e}.')
+        logger.exception(f'Could not get Video Data getVidData(sat, lon, lat, fileID). Exception: {e}.')
         return
 
     # invert data to BGR for openCV
@@ -114,7 +114,7 @@ def send_video(fileID, dictIn):
         os.rename(filename, f'out/{fileID}DONE.mp4')
         logger.info(f'timelapse video saved as out/{fileID}DONE.mp4')
     except Exception as e:
-        logger.info(f'could not save file {fileID} because of the error: {e}')
+        logger.exception(f'could not save file {fileID} because of the error: {e}')
     
     return
 
@@ -166,7 +166,7 @@ while True:
         try:
             fileID = min(os.listdir(inDir), key=lambda f: os.path.getctime(f'{inDir}/{f}'))
         except Exception as e:
-            logger.info(f'Could not access oldest file: {e}')
+            logger.exception(f'Could not access oldest file: {e}')
             fileID = None
     
     # open file from the /in directory
@@ -176,7 +176,7 @@ while True:
             with open(f'in/{fileID}', 'rb') as f:
                 requestedDict = pickle.load(f)
         except Exception as e:
-            logger.info(f'Failed to open the input file or assign dictionary. {e}')
+            logger.exception(f'Failed to open the input file or assign dictionary. {e}')
             requestedDict = None
             
         
