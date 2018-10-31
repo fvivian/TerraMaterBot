@@ -18,11 +18,10 @@ import logging
 import numpy as np
 import time
 import json
-from pyproj import Proj, transform
 import io
 from PIL import Image
 import os
-import utils
+import utils_vid as uv
 
 userOld = None
 timeOld = None
@@ -121,7 +120,7 @@ def send_video(fileID, dictIn):
 
 def get_video_data(sat, lon, lat, fileID):
     
-    vid_dates = utils.get_image_dates(sat, lon, lat, for_video=True)
+    vid_dates = uv.get_image_dates(sat, lon, lat)
 
     res = []
     threshold = 75  # in percent, 100% means every image will be used.
@@ -129,19 +128,19 @@ def get_video_data(sat, lon, lat, fileID):
 
     for day in vid_dates:
         try:
-            url = utils.create_wms_image_url(sat, lon, lat, gas=None)
-            r = requests.get(url, {**day}, timeout=10)
+            url = uv.create_wms_image_url(sat, lon, lat, gas=None)
+            r = requests.get(url, f'time={day}', timeout=10)
             img_tiff =  np.array(Image.open(io.BytesIO(r.content)))
             if img_tiff[(img_tiff >= 240).all(axis=2)].shape[0] <= max_white_pix:
                 res.append((day, img_tiff))
+        except requests.exceptions.RequestException as e:
+            logger.exception(f'WMS server did not respond in time.')
+            raise requests.exceptions.RequestsException('WMS server timed out')
         except Exception as e:
             logger.exception(f'Exception in download loop (requests to sentinel-hub), Exception: {e}, URL: {r.url}')
         if len(res) >= 10:
             logger.info(f'Download loop, all data downloaded.')
             return(res)
-    else:
-        logger.info(f'not enough usable data on first 10 pages. Aborting download.')
-        return
 
     logger.info(f'Downloaded data for {len(res)} dates.')
     return(res)

@@ -3,5 +3,5 @@
 # except for python scripts
 !TerraMaterBot.py
 !createVid.py
-!utils.py
+!utils*
 !.gitignore
