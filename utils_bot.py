@@ -129,7 +129,7 @@ def create_parameters_wfs(sat, lon, lat, gas=None):
     if sat == 'S1':
         ID = tokens['wms_token']['sentinel1']
         URL = 'http://services.sentinel-hub.com/ogc/wfs/' + ID
-        params['typenames'] = 'S1.TILE'
+        params['typenames'] = 'DSS3'
     if sat == 'S2':
         ID = tokens['wms_token']['sentinel2']
         URL = 'http://services.sentinel-hub.com/ogc/wfs/' + ID
@@ -149,28 +149,19 @@ def create_parameters_wfs(sat, lon, lat, gas=None):
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
     return(URL, params)
 
-def get_image_dates(sat, lon, lat, for_video=False, gas=None):
+def get_image_date(sat, lon, lat, gas=None):
     URL, params = create_parameters_wfs(sat, lon, lat)
 
     try:
         r = requests.get(URL, {**params}, timeout=10)
         js = json.loads(r.content)
-        if for_video:
-            dates = []
-            date_old = None
-            for j in js['features']:
-                if date_old != j['properties']['date']:
-                    dates.append(j['properties']['date'])
-                date_old = j['properties']['date']
-            return(dates)
-        else:
-            return(js['features'][0]['properties']['date'])
+        date = js['features'][0]['properties']['date']
+        return(date)
     except requests.exceptions.RequestException as e:
         logger.exception(f'WMS server did not respond to GetFeatureInfo request in time.')
         raise requests.exceptions.RequestsException('WMS server timed out')
     except Exception as e:
-        logger.exception(f'Exception in get_latest_image_date')
-        logger.info(f'URL that caused exception: {r.url}')
+        logger.exception(f'Exception in get_image_date, url that caused exception: {r.url}')
         raise
 
 def get_current_S5P_image(lon, lat, gas):

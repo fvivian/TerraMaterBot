@@ -26,7 +26,7 @@ import certifi
 import ssl
 import geopy.geocoders
 
-import utils
+import utils_bot
 
 ctx = ssl.create_default_context(cafile=certifi.where())
 geopy.geocoders.options.default_ssl_context = ctx
@@ -104,13 +104,13 @@ def request_image(satellite, bot, update, user_data):
         logger.info(f'{update.message.from_user.id} has no location')
         update.message.reply_text('Please send me a location first.')
         return
-    url = utils.generate_browser_url('S2', None, lon, lat)
+    url = utils_bot.generate_browser_url('S2', None, lon, lat)
 
     try:
-        date = utils.get_latest_image_date(satellite, lon, lat)
+        date = utils_bot.get_image_date(satellite, lon, lat)
         cf = ('cloudfree ' if satellite is 'S2' else '')
         update.message.reply_text(f'The latest {satellite} {cf}image was acquired on {date}')
-        img_url = utils.create_wms_image_url(satellite, lon, lat)
+        img_url = utils_bot.create_wms_image_url(satellite, lon, lat)
         update.message.reply_photo(photo=img_url)
         update.message.reply_text(text=f'Browse it here in the <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
@@ -175,9 +175,9 @@ def NO2(bot, update, user_data):
     update.message.reply_text('Thank you. Creating the Sentinel-5P NO2 image might take a few seconds.',
                               reply_markup=entry_markup)
     lon, lat = user_data['location']
-    url = utils.generate_browser_url('S5P', None, lon, lat, no2=True)
+    url = utils_bot.generate_browser_url('S5P', None, lon, lat, no2=True)
     try:
-        img = utils.get_current_S5P_image(lon, lat, user_data['trace_gas'])
+        img = utils_bot.get_current_S5P_image(lon, lat, user_data['trace_gas'])
         #date= utils.get_latest_image_date('S5P', lon, lat, gas=user_data['trace_gas'])
         #update.message.reply_text(f'The latest Sentinel-5P image was acquired on {date}')
         update.message.reply_photo(photo=img, reply_markup=entry_markup)
@@ -199,9 +199,9 @@ def CO(bot, update, user_data):
     update.message.reply_text('Thank you. Creating the Sentinel-5P CO image might take a few seconds.',
                               reply_markup=entry_markup)
     lon, lat = user_data['location']
-    url = utils.generate_browser_url('S5P', None, lon, lat, no2=False)
+    url = utils_bot.generate_browser_url('S5P', None, lon, lat, no2=False)
     try:
-        img = utils.get_current_S5P_image(lon, lat, user_data['trace_gas'])
+        img = utils_bot.get_current_S5P_image(lon, lat, user_data['trace_gas'])
         #date= utils.get_latest_image_date('S5P', lon, lat, gas=user_data['trace_gas'])
         #update.message.reply_text(f'The latest Sentinel-5P image was acquired on {date}')
         update.message.reply_photo(photo=img, reply_markup=entry_markup)
