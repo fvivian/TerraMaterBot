@@ -3,5 +3,5 @@
 # except for python scripts
 !TerraMaterBot.py
 !createVid.py
-!config.cfg
+!utils*
 !.gitignore

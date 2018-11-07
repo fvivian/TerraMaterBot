@@ -18,10 +18,10 @@ import logging
 import numpy as np
 import time
 import json
-from pyproj import Proj, transform
 import io
 from PIL import Image
 import os
+import utils_vid as uv
 
 userOld = None
 timeOld = None
@@ -30,23 +30,22 @@ timeOld = None
 with open('configFips.cfg') as f:
     tokens = json.loads(f.read())
 
-logformat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+logformat = '%(asctime)s - %(name)s - %(levelname)s: %(filename)s in line %(lineno)d - %(message)s'
 logging.basicConfig(format=logformat,
                     filename=f'vidScript.log',
                     level=logging.INFO)
-
 logger = logging.getLogger(__name__)
-logger.info(f'Starting the bot ...')
+logger.info(f'Starting the bot...')
 
-def sendVid(fileID, dictIn):
+def send_video(fileID, dictIn):
     
     sat  = dictIn['sat']
     lon, lat = dictIn['location']
 
     try:
-        vidDataRaw = getVidData(sat, lon, lat, fileID)
+        vidDataRaw = get_video_data(sat, lon, lat, fileID)
     except Exception as e:
-        logger.info(f'Could not get Video Data getVidData(sat, lon, lat, fileID). Exception: {e}.')
+        logger.exception(f'Could not get Video Data getVidData(sat, lon, lat, fileID). Exception: {e}.')
         return
 
     # invert data to BGR for openCV
@@ -114,147 +113,49 @@ def sendVid(fileID, dictIn):
         os.rename(filename, f'out/{fileID}DONE.mp4')
         logger.info(f'timelapse video saved as out/{fileID}DONE.mp4')
     except Exception as e:
-        logger.info(f'could not save file {fileID} because of the error: {e}')
+        logger.exception(f'could not save file {fileID} because of the error: {e}')
     
     return
-    
-def getVidInfo(sat, lon, lat, fileID, page=1):
-        
-        
-    params_eocurl = {'dataset': 'ESA-DATASET',
-                     'lat': f'{lat}',
-                     'lon': f'{lon}',
-                     'maxRecords': 100,
-                     'sortOrder': 'descending',
-                     'sortParam': 'startDate'}
-    if sat == 'S1':
-        satellite = 'Sentinel1'
-        params_eocurl['productType'] = 'GRD'
-        params_eocurl['processingLevel'] = 'LEVEL1'
-        satTimeout = 10
-    if sat == 'S2':
-        satellite = 'Sentinel2'
-        params_eocurl['cloudCover'] = '[0,10]'
-        satTimeout = 10
-    elif sat == 'S3':
-        satellite = 'Sentinel3'
-        params_eocurl['processingLevel'] = 'LEVEL1'
-        params_eocurl['maxRecords'] = 20
-        params_eocurl['page'] = page
-        satTimeout = 40
-    
-    EOCURL = f'https://finder.eocloud.eu/resto/api/collections/{satellite}/search.json?'
-    
-    try:
-        r1 = requests.get(EOCURL, params_eocurl, timeout=satTimeout)
-        logger.info(f'Finder responds in {r1.elapsed.total_seconds()} seconds to {r1.url}.')
-    except requests.exceptions.RequestException as e:
-        logger.info(f'Finder did not respond in time {satTimeout}, {e}')
-        os.rename(f'in/{fileID}', f'in/{fileID}TIMEDOUT')
-        raise requests.exceptions.RequestException('Finder timeout for getVidInfo')
-    except Exception as e:
-        logger.info(f'Exception in getVidInfo({sat}, {lon}, {lat}, {fileID}): {e}')
-        raise
-
-    js = json.loads(r1.content)
-    products = []
-    day_old = None
-    
-    try:
-        for j in js['features']:
-            day = j['properties']['startDate'].split('T')[0]
-            if day_old != day:
-                products.append((day, j))
-            day_old = day
-        return(list(reversed(products)))
-    except Exception as e:
-        logger.info(f'Could not get the dates from the EO Cloud. {e}')
-        raise
 
 
-def getVidData(sat, lon, lat, fileID):
+def get_video_data(sat, lon, lat, fileID):
     
-    vidDates = getVidInfo(sat, lon, lat, fileID)
-    if vidDates is None:
-        raise TypeError('getVidInfo returned None')
-    
-    params = {'service': 'WMS',
-              'request': 'GetMap',
-              'styles': '',
-              'format': 'image/png',
-              'version': '1.1.1',
-              'showlogo': 'false',
-              'height': 320,
-              'width': 480,
-              'srs': 'EPSG%3A3857'}
-    
-    if sat == 'S1':
-        ID = tokens['wms_token']['sentinel1']
-        URL= 'https://services.sentinel-hub.com/ogs/wms'+ID
-        params['layers'] = 'S1-VV-ORTHORECTIFIED'
-        reso = 60
-        threshold = 5 # in percent, 100% means every image will be used.
-    if sat == 'S2':
-        ID = tokens['wms_token']['sentinel2']
-        URL = 'https://services.sentinel-hub.com/ogc/wms/'+ID
-        params['layers'] = 'S2-TRUE-COLOR'
-        reso = 60
-        threshold = 5 # in percent, 100% means every image will be used.
-    elif sat == 'S3':
-        ID = tokens['wms_token']['sentinel3']
-        URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ID
-        params['layers'] = 'S3_TRUE_COLOR'
-        threshold = 75 # in percent, 100% means every image will be used.
-        reso = 1000
-        
-    inProj = Proj(init='epsg:4326')
-    outProj = Proj(init='epsg:3857')
-    xC,yC = transform(inProj,outProj, lon, lat)
-    xmin = xC - 480*reso/2
-    xmax = xC + 480*reso/2
-    ymin = yC - 320*reso/2
-    ymax = yC + 320*reso/2
+    vid_dates = uv.get_image_dates(sat, lon, lat)
 
-    params['bbox'] = str(xmin)+', '+str(ymin)+', '+str(xmax)+', '+str(ymax)
-    
     res = []
-    maxWhitePix = 480 * 320 * threshold/100
-    l=2
-    while l<12:
-        for i, (day, j) in enumerate(vidDates):
-            try:
-                r = requests.get(URL, {**params, **{'time': f'{day}/{day}'}}, timeout=10)
-                imgTiff =  np.array(Image.open(io.BytesIO(r.content)))
-                if imgTiff[(imgTiff >= 240).all(axis=2)].shape[0] <= maxWhitePix:
-                    res.append((day, imgTiff))
-            except Exception as e:
-                logger.info(f'Exception in download loop (requests to sentinel-hub), Exception: {e}, URL: {r.url}')
-            if len(res) >= 10:
-                logger.info(f'Download loop, all data downloaded.')
-                return(res)
-        if len(res) < 10:
-            logger.info(f'not enough usable data on page {l-1}')
-            vidDates = getVidInfo(sat, lon , lat, fileID, page=l)
-            l += 1
-        else:
-            logger.info(f'not enough usable data on first 10 pages. Aborting download.')
-            return
-    print(res)
+    threshold = 75  # in percent, 100% means every image will be used.
+    max_white_pix = 480 * 320 * threshold / 100
+
+    for day in vid_dates:
+        try:
+            url = uv.create_wms_image_url(sat, lon, lat, gas=None)
+            r = requests.get(url, f'time={day}', timeout=10)
+            img_tiff =  np.array(Image.open(io.BytesIO(r.content)))
+            if img_tiff[(img_tiff >= 240).all(axis=2)].shape[0] <= max_white_pix:
+                res.append((day, img_tiff))
+        except requests.exceptions.RequestException as e:
+            logger.exception(f'WMS server did not respond in time.')
+            raise requests.exceptions.RequestsException('WMS server timed out')
+        except Exception as e:
+            logger.exception(f'Exception in download loop (requests to sentinel-hub), Exception: {e}, URL: {r.url}')
+        if len(res) >= 10:
+            logger.info(f'Download loop, all data downloaded.')
+            return(res)
 
     logger.info(f'Downloaded data for {len(res)} dates.')
     return(res)
-    
-    '''output is a list with the following structure:
-    [('2018-02-20', array([[[255, 255, 255],
-        [255, 255, 255],
-        ...,]]]))
-    [('2018-02-15', array([[[255, 255, 255],
-        [255, 255, 255],
-        [255, 255, 255],
-        ...,]]]))
-    
-    res[0][1] gives acces to the img data for the first date.
-    res[0][0] gives acces to the first date.'''
+
+    """('output is a list with the following structure:
+         [('2018-02-20', array([[[255, 255, 255],
+             [255, 255, 255],
+             ...,]]]))
+         [('2018-02-15', array([[[255, 255, 255],
+             [255, 255, 255],
+             [255, 255, 255],
+             ...,]]]))
+         
+         res[0][1] gives acces to the img data for the first date.
+         res[0][0] gives acces to the first date.')"""
 
 while True:
     
@@ -264,7 +165,7 @@ while True:
         try:
             fileID = min(os.listdir(inDir), key=lambda f: os.path.getctime(f'{inDir}/{f}'))
         except Exception as e:
-            logger.info(f'Could not access oldest file: {e}')
+            logger.exception(f'Could not access oldest file: {e}')
             fileID = None
     
     # open file from the /in directory
@@ -274,7 +175,7 @@ while True:
             with open(f'in/{fileID}', 'rb') as f:
                 requestedDict = pickle.load(f)
         except Exception as e:
-            logger.info(f'Failed to open the input file or assign dictionary. {e}')
+            logger.exception(f'Failed to open the input file or assign dictionary. {e}')
             requestedDict = None
             
         
@@ -285,7 +186,7 @@ while True:
         else:
             logger.info(f'Timelapse request from {requestedDict["user_id"]} at {requestedDict["last_visit"]} for {requestedDict["sat"]} at {requestedDict["location"]}.')
             start = time.time()
-            sendVid(fileID, requestedDict)
+            send_video(fileID, requestedDict)
             end = time.time()
             duration = end - start
             logger.info(f'elapsed time to create video: {duration}')
