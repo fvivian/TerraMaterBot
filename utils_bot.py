@@ -83,7 +83,7 @@ def create_wms_image_url(sat, lon, lat, gas=None):
         ID = tokens['wms_token']['sentinel3']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
         params['layers'] = 'S3_TRUE_COLOR'
-        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=5e2)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
     if sat == 'S5P':
         ID = tokens['wms_token']['sentinel5p']
@@ -139,7 +139,7 @@ def create_parameters_wfs(sat, lon, lat, gas=None):
         ID = tokens['wms_token']['sentinel3']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wfs/' + ID
         params['typenames'] = 'S3.TILE'
-        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=5e2)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
     if sat == 'S5P':
         ID = tokens['wms_token']['sentinel5p']
@@ -150,16 +150,17 @@ def create_parameters_wfs(sat, lon, lat, gas=None):
     return(URL, params)
 
 def get_image_date(sat, lon, lat, gas=None):
-    URL, params = create_parameters_wfs(sat, lon, lat)
+    url, params = create_parameters_wfs(sat, lon, lat)
+    URL = f'{url}?{urlencode(params)}'
 
     try:
-        r = requests.get(URL, {**params}, timeout=10)
+        r = requests.get(URL, timeout=20)
         js = json.loads(r.content)
         date = js['features'][0]['properties']['date']
         return(date)
     except requests.exceptions.RequestException as e:
-        logger.exception(f'WMS server did not respond to GetFeatureInfo request in time.')
-        raise requests.exceptions.RequestsException('WMS server timed out')
+        logger.exception(f'WFS server did not respond to GetFeature request in time. URL: {URL}')
+        raise 
     except Exception as e:
         logger.exception(f'Exception in get_image_date, url that caused exception: {r.url}')
         raise
@@ -168,7 +169,7 @@ def get_current_S5P_image(lon, lat, gas):
 
     URL = create_wms_image_url('S5P', lon, lat, gas=gas)
 
-    r = requests.get(URL, timeout=10)
+    r = requests.get(URL, timeout=20)
     try:
         with MemoryFile(r.content) as memfile:
             with memfile.open() as dataset:

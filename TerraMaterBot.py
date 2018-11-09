@@ -115,9 +115,9 @@ def request_image(satellite, bot, update, user_data):
         update.message.reply_text(text=f'Browse it here in the <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
                                   disable_web_page_preview=True)
-    except requests.exceptions.Timeout:
-        update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
-        logger.exception('Connection to WMS server for f{satellite} timed out. URL: {img_url}.')
+    #except requests.exceptions.Timeout:
+    #    update.message.reply_text('Unfortunately, the connection to the WMS server timed out. Please try again later.')
+    #    logger.exception('Connection to WMS server for f{satellite} timed out. URL: {img_url}.')
     except Exception as e:
         update.message.reply_text('I\'m afraid I couldn\'t open the image for unkown reasons. Please try again later.')
         logger.exception(f'Could not get/open image from the WMS server. Exception: {e}. URL: {img_url}.')
