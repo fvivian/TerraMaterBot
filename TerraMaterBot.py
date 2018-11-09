@@ -46,7 +46,7 @@ logging.basicConfig(format=logformat,
 logger = logging.getLogger(__name__)
 
 entry_keyboard = [['/S1', '/S2', '/S3', '/S5P'],
-                  [tl.KeyboardButton('location', request_location=True), '/timelapse', '/help']]
+                  [tl.KeyboardButton('location', request_location=True), '/help']]
 entry_markup = tl.ReplyKeyboardMarkup(entry_keyboard)
 
 
@@ -74,7 +74,7 @@ def help(bot, update):
                               '/S2: request a Sentinel-2 MSI image from your chosen location.\n'
                               '/S3: request a Sentinel-3 OLCI image from your chosen location.\n'
                               '/S5P: request a Sentinel-5P image from your chosen location.\n\n'
-                              '/timelapse: request an animated GIF of a time lapse for Sentinel-2 or -3.\n'
+                              #'/timelapse: request an animated GIF of a time lapse for Sentinel-2 or -3.\n'
                               '/help: display this message.\n'
                               '/start: display the initial welcoming message.\n\n'
                               'You can send me your current location by pressing the location button below or you can send me any location '
@@ -356,9 +356,9 @@ def error(bot, update, error):
 def main():
     def load_state():
         try:
-            with open(f'backup/conversationsV4', 'rb') as f:
+            with open(f'backup/conversationsV5', 'rb') as f:
                 conv_handler.conversations = pickle.load(f)
-            with open(f'backup/userdataV4', 'rb') as f:
+            with open(f'backup/userdataV5', 'rb') as f:
                 dp.user_data = pickle.load(f)
         except FileNotFoundError:
             logger.error('Data file(s) for restoring state not found')
@@ -377,9 +377,9 @@ def main():
             # Before pickling
             resolved = conv_handler.conversations.copy()
             try:
-                with open(f'backup/conversationsV4', 'wb+') as f:
+                with open(f'backup/conversationsV5', 'wb+') as f:
                     pickle.dump(resolved, f)
-                with open(f'backup/userdataV4', 'wb+') as f:
+                with open(f'backup/userdataV5', 'wb+') as f:
                     pickle.dump(dp.user_data, f)
             except Exception as e:
                 logger.error(f'Could not save state: {e}')
@@ -387,7 +387,7 @@ def main():
                 logger.error(sys.exc_info()[0])
             if backupWait == 1440:  # for backing up userdata every 24 hours (1 step/min * 60 min/h * 24 h/day)
                 backuptime = datetime.datetime.today().isoformat()[:-7].replace(':', '')
-                f = open(f'backup/userdataV3{backuptime}', 'wb+')
+                f = open(f'backup/userdataV5{backuptime}', 'wb+')
                 pickle.dump(dp.user_data, f)
                 f.close()
                 backupWait = 0
@@ -410,7 +410,7 @@ def main():
         CommandHandler('s2', s2, pass_user_data=True),
         CommandHandler('s3', s3, pass_user_data=True),
         CommandHandler('s5p', s5p, pass_user_data=True),
-        CommandHandler('timelapse', gif, pass_user_data=True, pass_job_queue=True),
+        #CommandHandler('timelapse', gif, pass_user_data=True, pass_job_queue=True),
         CommandHandler('NO2', NO2, pass_user_data=True),
         CommandHandler('CO', CO, pass_user_data=True),
         MessageHandler(Filters.location, location, pass_user_data=True),
