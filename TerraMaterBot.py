@@ -4,8 +4,6 @@ Created on Thu Apr 19 10:11:51 2018
 
 @author: Administrator
 """
-
-
 import json
 import logging
 import os
@@ -21,25 +19,28 @@ from telegram.ext import CommandHandler, ConversationHandler, \
     Filters, MessageHandler, RegexHandler, Updater
 from telegram.ext.dispatcher import run_async
 import requests
+
 from geopy.geocoders import Nominatim
 import certifi
 import ssl
 import geopy.geocoders
-
 import utils_bot
 
 ctx = ssl.create_default_context(cafile=certifi.where())
 geopy.geocoders.options.default_ssl_context = ctx
 hostname = socket.gethostname()
+
 geolocator = Nominatim(user_agent='myApp')
 CONVERSATION, = range(1)
 
 # import all the necessary tokens/IDs:
+
 with open('config_bot.cfg') as f:
     tokens = json.loads(f.read())
 
 # Enable logging
 logformat = '%(asctime)s - %(name)s - %(levelname)s in %(filename)s, line %(lineno)d - %(message)s'
+
 logging.basicConfig(format=logformat,
                     filename=f'logTerraMater.log',
                     level=logging.INFO)
@@ -48,7 +49,6 @@ logger = logging.getLogger(__name__)
 entry_keyboard = [['/S1', '/S2', '/S3', '/S5P'],
                   [tl.KeyboardButton('location', request_location=True), '/help']]
 entry_markup = tl.ReplyKeyboardMarkup(entry_keyboard)
-
 
 # Define a few command handlers. These usually take the two arguments bot and
 # update. Error handlers also receive the raised TelegramError object in error.
@@ -82,8 +82,8 @@ def help(bot, update):
                               'Additionly, you can send names of cities, places, streets or similar. You can even try voice input.\n'
                               'To switch between normal keyboard and buttons, tap on the keyboard icon next to the entry field.',
                               reply_markup=entry_markup)
-
     return CONVERSATION
+
 
 
 def log_action(request, bot, update, user_data):
@@ -94,7 +94,6 @@ def log_action(request, bot, update, user_data):
     else:
         logger.info(f'{user.id} requests {request} but has no location')
 
-
 @run_async
 def request_image(satellite, bot, update, user_data):
     user_data['last_visit'] = datetime.datetime.now()
@@ -104,6 +103,7 @@ def request_image(satellite, bot, update, user_data):
         logger.info(f'{update.message.from_user.id} has no location')
         update.message.reply_text('Please send me a location first.')
         return
+
     url = utils_bot.generate_browser_url('S2', None, lon, lat)
 
     try:
@@ -143,6 +143,7 @@ def s2(bot, update, user_data):
         update.message.reply_text('Please send me a location first.')
         return
     log_action('S2', bot, update, user_data)
+
     request_image('S2', bot, update, user_data)
     return CONVERSATION
 
@@ -154,6 +155,7 @@ def s3(bot, update, user_data):
         update.message.reply_text('Please send me a location first.')
         return
     log_action('S3', bot, update, user_data)
+
     request_image('S3', bot, update, user_data)
     return CONVERSATION
 
@@ -248,14 +250,12 @@ def gif(bot, update, user_data, job_queue):
                               'Creating the file might take a few minutes. '
                               f'The animation will include the latest ten {cf}images. '
                               'You can send image requests in the meantime.')
-    # request_gif(bot, update, user_data)
     filename = uuid.uuid4()
     with open(f'in/{filename}', 'wb+') as f:
         pickle.dump(user_data, f)
 
     job_queue.run_repeating(check_for_animation, interval=11.0, first=0, context=filename)
     return CONVERSATION
-
 
 def check_for_animation(bot, job):
     if os.path.isfile(f'in/{job.context}TIMEDOUT'):
@@ -264,6 +264,7 @@ def check_for_animation(bot, job):
             user_data = pickle.load(f)
         bot.send_message(chat_id=user_data['user_id'],
                          text='I\'m sorry I could not create a time lapse video. The server did not respond in time.')
+
         logger.info(f'{job.context} was removed due to a time out.')
         os.remove(f'in/{job.context}TIMEDOUT')
         return CONVERSATION
@@ -273,6 +274,7 @@ def check_for_animation(bot, job):
             user_data = pickle.load(f)
         bot.send_message(chat_id=user_data['user_id'],
                          text='I\'m sorry I could not create a time lapse video. There are not enough images that meet the requirements.')
+
         logger.info(f'{job.context} was removed due to too few usable images.')
         os.remove(f'in/{job.context}EMPTY')
         return CONVERSATION
@@ -301,7 +303,6 @@ def check_for_animation(bot, job):
 
     return CONVERSATION
 
-
 def location(bot, update, user_data):
     msg = update.message
     user = msg.from_user
@@ -310,7 +311,6 @@ def location(bot, update, user_data):
     logger.info(f'Location of {user.id}: {ulon}, {ulat}')
     msg.reply_text(f'Very good! Now select a satellite to get an image!')
     return CONVERSATION
-
 
 @run_async
 def get_and_respond_to_location(bot, update, user_data):
@@ -332,6 +332,7 @@ def get_and_respond_to_location(bot, update, user_data):
         update.message.reply_text(
             f'If this is the location you were looking for, get an image by using one of the buttons below. '
             'If this is not what you were looking for, re-send a location name or your location by using the button below.')
+
     else:
         update.message.reply_text('I can\'t find out where this is. Try again or send '
                                   'a location via the location button or the attachment menu.',
@@ -346,14 +347,14 @@ def echo(bot, update, user_data):
     logger.info(f'{user.id} sends {update.message.text}')
     if update.message.text != 'CO' and update.message.text != 'NO2':
         get_and_respond_to_location(bot, update, user_data)
-
-
+                    
 def error(bot, update, error):
     '''Log Errors caused by Updates.'''
     logger.warning(f'Update "{update}" caused error "{error}"')
 
 
 def main():
+
     def load_state():
         try:
             with open(f'backup/conversationsV5', 'rb') as f:
@@ -372,6 +373,7 @@ def main():
         while True:
             time.sleep(60)
             backupWait += 1
+
             # logger.info(f'Conv State to save is {conv_handler.conversations}')
             # logger.info(f'User State to save is {dp.user_data}')
             # Before pickling
@@ -380,6 +382,7 @@ def main():
                 with open(f'backup/conversationsV5', 'wb+') as f:
                     pickle.dump(resolved, f)
                 with open(f'backup/userdataV5', 'wb+') as f:
+
                     pickle.dump(dp.user_data, f)
             except Exception as e:
                 logger.error(f'Could not save state: {e}')
@@ -392,12 +395,13 @@ def main():
                 f.close()
                 backupWait = 0
 
+
     # Start the bot.
     logger.info(f'Starting the bot ... on {hostname}')
 
     # Create the EventHandler and pass it your bot's token.
     updater = Updater(tokens['bot_token'])
-    # job = updater.job_queue
+
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
