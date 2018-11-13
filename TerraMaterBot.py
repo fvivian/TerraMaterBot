@@ -104,7 +104,7 @@ def request_image(satellite, bot, update, user_data):
         update.message.reply_text('Please send me a location first.')
         return
 
-    url = utils_bot.generate_browser_url('S2', None, lon, lat)
+    url = utils_bot.generate_browser_url(satellite, None, lon, lat)
 
     try:
         date = utils_bot.get_image_date(satellite, lon, lat)
