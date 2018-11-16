@@ -34,20 +34,20 @@ def generate_browser_url(sat, date, lon, lat, no2=False):
         instrument = 'Sentinel-5P%20NO2' if no2 else 'Sentinel-5P%20CO'
         layer = 'NO2_VISUALIZED' if no2 else 'CO_VISUALIZED'
 
-    url = f'http://apps.sentinel-hub.com/eo-browser/#lat={lat}&' \
-          f'lng={lon}&zoom=10&datasource={instrument}&' \
-          f'time={date}&preset={layer}'
+    url = f'http://apps.sentinel-hub.com/eo-browser/?lat={lat}&' \
+          f'lng={lon}&zoom=9&time={date}&' \
+          f'preset={layer}&datasource={instrument}'
 
     return url
 
 
-def get_bounding_box(lon, lat, reso):
+def get_bounding_box(lon, lat, xdim, ydim, reso):
     inProj = Proj(init='epsg:4326')
     outProj = Proj(init='epsg:3857')
 
     xC, yC = transform(inProj, outProj, lon, lat)
-    width = 980
-    height = 540
+    width = xdim
+    height = ydim
     xmin = xC - width * reso / 2
     xmax = xC + width * reso / 2
     ymin = yC - height * reso / 2
@@ -55,8 +55,8 @@ def get_bounding_box(lon, lat, reso):
 
     return(xmin, ymin, xmax, ymax)
 
-def create_wms_image_url(sat, lon, lat, gas=None):
-    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
+def create_wms_image_url(sat, lon, lat, time, gas=None):
+    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, 1280, 720, reso=60)
 
     params = {'service': 'WMS',
               'request': 'GetMap',
@@ -82,14 +82,15 @@ def create_wms_image_url(sat, lon, lat, gas=None):
         ID = tokens['wms_token']['sentinel3']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
         params['layers'] = 'S3_TRUE_COLOR'
-        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=5e2)
+        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, 1280, 720, reso=5e2)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
+        params['time'] = time
     if sat == 'S5P':
         ID = tokens['wms_token']['sentinel5p']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ ID
         params['layers'] = f'S5P_{gas}'
         params['format'] = 'image/tiff'
-        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, 1280, 720, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
         
     url = f'{URL}?{urlencode(params)}'
@@ -117,7 +118,7 @@ def get_current_wms_image(sat, lon, lat):
 """
 
 def create_parameters_wfs(sat, lon, lat, gas=None):
-    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=60)
+    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, 10, 10, reso=60)
 
     params = {'service': 'WFS',
               'request': 'GetFeature',
@@ -138,13 +139,13 @@ def create_parameters_wfs(sat, lon, lat, gas=None):
         ID = tokens['wms_token']['sentinel3']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wfs/' + ID
         params['typenames'] = 'S3.TILE'
-        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=5e2)
+        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, 10, 10, reso=5e2)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
     if sat == 'S5P':
         ID = tokens['wms_token']['sentinel5p']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wfs/' + ID
         params['typenames'] = f'S5P_{gas}'
-        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+        xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, 10, 10, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
     return(URL, params)
 
@@ -156,7 +157,9 @@ def get_image_date(sat, lon, lat, gas=None):
         r = requests.get(URL, timeout=20)
         js = json.loads(r.content)
         date = js['features'][0]['properties']['date']
-        return(date)
+        time = js['features'][0]['properties']['time']
+        timeshort = f'{time.split(":")[0]}{time.split(":")[1]}{time.split(":")[2]}'
+        return(date, timeshort)
     except requests.exceptions.RequestException as e:
         logger.exception(f'WFS server did not respond to GetFeature request in time. URL: {URL}')
         raise 
@@ -187,7 +190,7 @@ def get_current_S5P_image(lon, lat, gas):
 
 def generate_s5p_image_from_data(data, lon, lat, layer):
     imgTiff = data * 1e4
-    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, reso=2e3)
+    xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, 1280, 720, reso=2e3)
     inProj = Proj(init='epsg:4326')
     outProj = Proj(init='epsg:3857')
 
