@@ -105,11 +105,11 @@ def request_image(satellite, bot, update, user_data):
         return
 
     try:
-        date = utils_bot.get_image_date(satellite, lon, lat)
-        url = utils_bot.generate_browser_url(satellite, date, lon, lat)
+        date, time = utils_bot.get_image_date(satellite, lon, lat)
+        url = utils_bot.generate_browser_url(satellite, lon, lat, date)
         cf = ('cloudfree ' if satellite is 'S2' else '')
         update.message.reply_text(f'The latest {satellite} {cf}image was acquired on {date}')
-        img_url = utils_bot.create_wms_image_url(satellite, lon, lat)
+        img_url = utils_bot.create_wms_image_url(satellite, lon, lat, date)
         update.message.reply_photo(photo=img_url)
         update.message.reply_text(text=f'Browse it here in the <a href="{url}">EO Browser</a>.',
                                   parse_mode=tl.ParseMode.HTML,
@@ -176,7 +176,7 @@ def NO2(bot, update, user_data):
     update.message.reply_text('Thank you. Creating the Sentinel-5P NO2 image might take a few seconds.',
                               reply_markup=entry_markup)
     lon, lat = user_data['location']
-    url = utils_bot.generate_browser_url('S5P', '', lon, lat, no2=True)
+    url = utils_bot.generate_browser_url('S5P', lon, lat, '', no2=True)
     try:
         img = utils_bot.get_current_S5P_image(lon, lat, user_data['trace_gas'])
         #date= utils.get_latest_image_date('S5P', lon, lat, gas=user_data['trace_gas'])
@@ -200,7 +200,7 @@ def CO(bot, update, user_data):
     update.message.reply_text('Thank you. Creating the Sentinel-5P CO image might take a few seconds.',
                               reply_markup=entry_markup)
     lon, lat = user_data['location']
-    url = utils_bot.generate_browser_url('S5P', '', lon, lat, no2=False)
+    url = utils_bot.generate_browser_url('S5P', lon, lat, '', no2=False)
     try:
         img = utils_bot.get_current_S5P_image(lon, lat, user_data['trace_gas'])
         #date= utils.get_latest_image_date('S5P', lon, lat, gas=user_data['trace_gas'])

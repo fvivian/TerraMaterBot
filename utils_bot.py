@@ -20,7 +20,7 @@ with open('configFips.cfg') as f:
     tokens = json.loads(f.read())
 
 
-def generate_browser_url(sat, date, lon, lat, no2=False):
+def generate_browser_url(sat, lon, lat, date, no2=False):
     if sat == 'S1':
         instrument = 'Sentinel-1%20GRD%20IW'
         layer = '1_VV_ORTHORECTIFIED'
@@ -68,6 +68,7 @@ def create_wms_image_url(sat, lon, lat, time, gas=None):
               'height': 720,
               'width': 1280,
               'srs': 'EPSG%3A3857',
+              'time': time,
               'bbox': f'{xmin}, {ymin}, {xmax}, {ymax}'}
     if sat == 'S1':
         ID = tokens['wms_token']['sentinel1']
@@ -84,12 +85,12 @@ def create_wms_image_url(sat, lon, lat, time, gas=None):
         params['layers'] = 'S3_TRUE_COLOR'
         xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, 1280, 720, reso=5e2)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
-        params['time'] = time
     if sat == 'S5P':
         ID = tokens['wms_token']['sentinel5p']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/'+ ID
         params['layers'] = f'S5P_{gas}'
         params['format'] = 'image/tiff'
+        params['time'] = ''
         xmin, ymin, xmax, ymax = get_bounding_box(lon, lat, 1280, 720, reso=2e3)
         params['bbox'] = f'{xmin}, {ymin}, {xmax}, {ymax}'
         
@@ -169,7 +170,7 @@ def get_image_date(sat, lon, lat, gas=None):
 
 def get_current_S5P_image(lon, lat, gas):
 
-    URL = create_wms_image_url('S5P', lon, lat, gas=gas)
+    URL = create_wms_image_url('S5P', lon, lat, '', gas=gas)
 
     r = requests.get(URL, timeout=20)
     try:
