@@ -104,10 +104,10 @@ def request_image(satellite, bot, update, user_data):
         update.message.reply_text('Please send me a location first.')
         return
 
-    url = utils_bot.generate_browser_url(satellite, None, lon, lat)
 
     try:
         date = utils_bot.get_image_date(satellite, lon, lat)
+        url = utils_bot.generate_browser_url(satellite, date, lon, lat)
         cf = ('cloudfree ' if satellite is 'S2' else '')
         update.message.reply_text(f'The latest {satellite} {cf}image was acquired on {date}')
         img_url = utils_bot.create_wms_image_url(satellite, lon, lat)
