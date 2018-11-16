@@ -33,7 +33,6 @@ def generate_browser_url(sat, date, lon, lat, no2=False):
     elif sat == 'S5P':
         instrument = 'Sentinel-5P%20NO2' if no2 else 'Sentinel-5P%20CO'
         layer = 'NO2_VISUALIZED' if no2 else 'CO_VISUALIZED'
-        date = ''
 
     url = f'http://apps.sentinel-hub.com/eo-browser/#lat={lat}&' \
           f'lng={lon}&zoom=10&datasource={instrument}&' \
