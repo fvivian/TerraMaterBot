@@ -19,7 +19,7 @@ params = {'service': 'WFS',
           'maxcc': 5,
           'bbox': f'{xmin}, {ymin}, {xmax}, {ymax}'}
 url_wfs = f'https://services.sentinel-hub.com/ogc/wfs/{ID}'
-res_wfs = requests.get(url_wfs, {\*\*params})
+res_wfs = requests.get(url_wfs, {**params})
 ```
 The response  (res_wfs) of this simple HTTP get request will be a json with information about the location (bbox) and layer (typenames) containing information such as time, date, geometry, or product name.
 The date will then be used for a GetMap WMS request with the following exemplary parameters:
