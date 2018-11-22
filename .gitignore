@@ -2,13 +2,8 @@
 *
 # except for python scripts
 !TerraMaterBot.py
-<<<<<<< HEAD
-!createVid.py
-!utils*
-!.gitignore
-=======
 !create_video.py
-!utils*
+!utils_bot.py
+!utils_vid.py
 !.gitignore
 
->>>>>>> master
