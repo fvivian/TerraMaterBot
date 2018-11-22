@@ -68,7 +68,7 @@ def create_wms_image_url(sat, lon, lat, time, gas=None):
               'height': 720,
               'width': 1280,
               'srs': 'EPSG%3A3857',
-              'time': time,
+              'time': f'{time}/{time}',
               'bbox': f'{xmin}, {ymin}, {xmax}, {ymax}'}
     if sat == 'S1':
         ID = tokens['wms_token']['sentinel1']
@@ -78,7 +78,7 @@ def create_wms_image_url(sat, lon, lat, time, gas=None):
         ID = tokens['wms_token']['sentinel2']
         URL = 'http://services.sentinel-hub.com/ogc/wms/' + ID
         params['layers'] = 'S2-TRUE-COLOR'
-        params['maxcc'] = 0
+        params['maxcc'] = 5
     if sat == 'S3':
         ID = tokens['wms_token']['sentinel3']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wms/' + ID
@@ -135,7 +135,7 @@ def create_parameters_wfs(sat, lon, lat, gas=None):
         ID = tokens['wms_token']['sentinel2']
         URL = 'http://services.sentinel-hub.com/ogc/wfs/' + ID
         params['typenames'] = 'S2.TILE'
-        params['maxcc'] = 0
+        params['maxcc'] = 5
     if sat == 'S3':
         ID = tokens['wms_token']['sentinel3']
         URL = 'http://services.eocloud.sentinel-hub.com/v1/wfs/' + ID
